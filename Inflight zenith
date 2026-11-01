@@ -1,0 +1,2595 @@
+Here is the updated, unified single-file solution.
+Key Upgrades & Changes Included:
+ * Removed: The "Offline Library / Mount Local Files & Folders" widget from the homepage dashboard.
+ * Admin PIN Lock: Accessing the Admin panel now prompts for a secure PIN (2026 or 7788).
+ * Cleaned Top Header: Cleaned up top icon clutter into a streamlined executive control cluster.
+ * Homepage 4K Trailer Player: Direct trailer preview launcher on the hero banner with a dedicated trailer modal.
+ * Membership Memory Profiles Page (membership-page): Persistent passenger profile with membership tier status, reward points, saved pod seat preferences, and trip history.
+ * Local Payment Gateway & Digital Receipts (payment-page): Interactive payment terminal (DuitNow QR, FPX, Touch 'n Go eWallet, Cards) that processes seat orders and prints/renders verifiable digital tax receipts.
+ * Auto-Brightness Sensor Detection: Integration with the Ambient Light Sensor API (AmbientLightSensor) with intelligent time-of-day lux fallback that dynamically adjusts screen luminosity and UI contrast.
+ * System Information Hub (sysinfo-page): Real-time hardware telemetry, Measat-3b satellite transponder frequencies, RAM/NVMe partitions, and bus power diagnostics.
+ * Player Settings Hub (settings-page): Dedicated settings for video playback (hardware acceleration, video tone mapping filters, subtitle formatting) and IAMF music playback (ReplayGain, 3D acoustic room simulator, bass exciters).
+ * Extensions & Plugins Hub (extensions-page): Modular toggleable add-ons (Live Translator, Karaoke Mode, Highway Speed Radar, Subtitle Enhancer).
+ * Corridor Weather Telemetry Modal: Comprehensive live meteorological radar and forecast along the North-South highway.
+ * New Luxury Wallpapers: Added new ultra-high-resolution aesthetic wallpapers with live switching.
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; media-src * data: blob:; img-src * data: blob:; connect-src * data: blob:; font-src * data:; object-src 'none'; base-uri 'self';">
+    <title>Anix Entertainment v6.0 - Platinum Hybrid Executive Suite</title>
+
+    <!-- FONTS & ICONS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+
+    <!-- CORE LIBRARIES -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'anix-dark': '#060509',
+                        'anix-surface': '#110F17',
+                        'anix-card': '#161420',
+                        'anix-red': '#E50914',
+                        'anix-purple': '#6D28D9',
+                        'anix-cyan': '#00F0FF',
+                        'anix-gold': '#F59E0B',
+                        'anix-emerald': '#10B981'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        display: ['Outfit', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/resonance-audio/build/resonance-audio.min.js"></script>
+
+    <style>
+        :root {
+            --ui-scale: 1;
+            --bg-theme-gradient: radial-gradient(130% 90% at 50% -10%, #151026 0%, #08070E 50%, #030206 100%);
+            --wallpaper-image: url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop');
+            --wallpaper-blur: 0px;
+            --wallpaper-brightness: 0.75;
+            --wallpaper-overlay-opacity: 0.65;
+            --cabin-mood-color: rgba(109, 40, 217, 0.22);
+            --video-filter: none;
+        }
+        body { 
+            background: #030206;
+            color: #F1F5F9;
+            padding-bottom: max(130px, env(safe-area-inset-bottom) + 90px); 
+            overflow-x: hidden; 
+            -webkit-tap-highlight-color: transparent; 
+            overscroll-behavior-y: none;
+            min-height: 100vh;
+            font-size: calc(1rem * var(--ui-scale));
+            transition: filter 0.3s ease;
+        }
+        #bg-component-system {
+            position: fixed; inset: 0; z-index: -100; pointer-events: none; overflow: hidden;
+        }
+        #bg-wallpaper-render {
+            position: absolute; inset: 0;
+            background-image: var(--bg-theme-gradient), var(--wallpaper-image);
+            background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;
+            filter: blur(var(--wallpaper-blur)) brightness(var(--wallpaper-brightness));
+            transform: scale(1.02); transition: filter 0.5s ease, background-image 0.75s ease;
+        }
+        #bg-ambient-canvas {
+            position: absolute; inset: 0; mix-blend-mode: screen; opacity: 0.35; transition: opacity 0.5s ease;
+        }
+        #bg-system-overlay {
+            position: absolute; inset: 0;
+            background: radial-gradient(circle at 50% 20%, rgba(3,2,6, 0.4) 0%, rgba(3,2,6, 0.96) 100%);
+            opacity: var(--wallpaper-overlay-opacity); transition: opacity 0.5s ease;
+        }
+
+        .glass-panel {
+            background: rgba(17, 15, 23, 0.82);
+            backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.75);
+        }
+        .glass-card {
+            background: linear-gradient(150deg, rgba(26, 23, 34, 0.65) 0%, rgba(13, 11, 18, 0.85) 100%);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            border-color: rgba(255, 255, 255, 0.22);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px -8px rgba(0, 0, 0, 0.6);
+        }
+
+        .interactive-btn {
+            position: relative; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden; user-select: none;
+        }
+        .interactive-btn:active { transform: scale(0.97); }
+
+        .a11y-high-contrast { filter: contrast(140%) brightness(105%); }
+        .a11y-high-contrast .glass-panel, .a11y-high-contrast .glass-card { background: #000000 !important; border: 2px solid #FFFFFF !important; }
+        .a11y-high-contrast text, .a11y-high-contrast p, .a11y-high-contrast span { color: #FFFFFF !important; }
+        .dyslexic-font { font-family: 'Comic Sans MS', 'OpenDyslexic', sans-serif !important; }
+        .reduced-motion * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+
+        #lounge-overlay { pointer-events: none; transition: opacity 1.2s ease; background-color: var(--cabin-mood-color); }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .bottom-nav { 
+            position: fixed; bottom: max(14px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); 
+            background: rgba(12, 10, 18, 0.95); backdrop-filter: blur(32px); 
+            border: 1px solid rgba(255, 255, 255, 0.1); z-index: 500; height: 70px; 
+            display: flex; justify-content: space-between; align-items: center; 
+            width: 95%; max-width: 980px; border-radius: 2.25rem; 
+            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.85); padding: 0 8px; overflow-x: auto;
+        }
+        .nav-item { 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            gap: 2px; color: #8E9BAE; cursor: pointer; flex: 1; min-width: 52px; transition: 0.2s ease; 
+            padding: 6px 4px; border-radius: 1.25rem; 
+        }
+        .nav-item.active { color: #FFFFFF; background: rgba(255, 255, 255, 0.08); font-weight: 700; }
+        .nav-item.active i { color: #E50914; transform: translateY(-1px); }
+
+        .video-js { background-color: transparent !important; width: 100% !important; height: 100% !important; font-family: 'Inter', sans-serif; filter: var(--video-filter); }
+        .vjs-control-bar { display: none !important; }
+
+        .custom-slider {
+            -webkit-appearance: none; appearance: none; background: rgba(255,255,255,0.12);
+            height: 5px; border-radius: 6px; outline: none; cursor: pointer;
+        }
+        .custom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 15px; height: 15px; border-radius: 50%;
+            background: #E50914; cursor: pointer; box-shadow: 0 0 10px rgba(229, 9, 20, 0.85); border: 2px solid white;
+        }
+        .custom-slider-purple::-webkit-slider-thumb { background: #9333ea !important; box-shadow: 0 0 10px rgba(147, 51, 234, 0.85) !important; }
+        .custom-slider-amber::-webkit-slider-thumb { background: #f59e0b !important; box-shadow: 0 0 10px rgba(245, 158, 11, 0.85) !important; }
+
+        .eq-slider { -webkit-appearance: none; appearance: none; background: rgba(255,255,255,0.15); width: 6px; height: 110px; border-radius: 5px; outline: none; writing-mode: vertical-lr; direction: rtl; }
+        .eq-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #E50914; border-radius: 50%; cursor: pointer; border: 2px solid white; }
+
+        #threejs-canvas-container { width: 130px; height: 130px; position: absolute; top: -5px; right: -5px; z-index: 10; pointer-events: none; opacity: 0.45; }
+        @media (min-width: 768px) { #threejs-canvas-container { width: 200px; height: 200px; top: -10px; right: -10px; } }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .playing-disk { animation: spin 8s linear infinite; }
+        .paused-disk { animation-play-state: paused; }
+        .hidden-page { display: none !important; }
+
+        .hero-app-tile {
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 1.1rem; padding: 0.8rem 0.5rem;
+            cursor: pointer; transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.35rem; user-select: none;
+        }
+        .hero-app-tile:hover {
+            transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.07);
+        }
+        .hero-app-icon {
+            width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; transition: transform 0.2s ease;
+        }
+        .hero-app-tile:hover .hero-app-icon { transform: scale(1.06); }
+
+        .ad-slide { display: none; animation: fadeIn 0.3s ease forwards; }
+        .ad-slide.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Receipt Print Styling */
+        @media print {
+            body * { visibility: hidden; }
+            #receipt-print-area, #receipt-print-area * { visibility: visible; }
+            #receipt-print-area { position: absolute; left: 0; top: 0; width: 100%; color: #000 !important; background: #fff !important; }
+        }
+    </style>
+</head>
+<body class="text-slate-100 font-sans antialiased selection:bg-red-500/30">
+
+    <!-- DYNAMIC BACKGROUND SUBSYSTEM -->
+    <div id="bg-component-system" aria-hidden="true">
+        <div id="bg-wallpaper-render"></div>
+        <canvas id="bg-ambient-canvas"></canvas>
+        <div id="bg-system-overlay"></div>
+    </div>
+
+    <div id="lounge-overlay" class="fixed inset-0 z-[8000] opacity-0 pointer-events-none mix-blend-overlay"></div>
+
+    <!-- CABIN ANNOUNCEMENT OVERLAY BANNER -->
+    <div id="crew-pa-banner" class="fixed top-20 inset-x-4 max-w-xl mx-auto glass-panel p-3.5 rounded-2xl z-[9000] border border-amber-500/40 shadow-2xl hidden flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-amber-500 text-black flex items-center justify-center text-sm font-bold shrink-0">
+                <i class="fas fa-bullhorn"></i>
+            </div>
+            <div>
+                <span class="text-[9px] font-mono text-amber-400 font-bold uppercase tracking-wider block">Cabin Broadcast</span>
+                <p id="crew-pa-text" class="text-xs font-semibold text-white">Approaching Gunung Semanggol R&R. 15-minute comfort stop.</p>
+            </div>
+        </div>
+        <button onclick="dismissCrewPA()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center">
+            <i class="fas fa-xmark text-xs"></i>
+        </button>
+    </div>
+
+    <!-- ==================== HOMEPAGE 4K TRAILER MODAL ==================== -->
+    <div id="trailer-modal" class="fixed inset-0 z-[9995] bg-black/90 backdrop-blur-xl hidden-page flex flex-col justify-center items-center p-4 md:p-8">
+        <div class="max-w-4xl w-full glass-panel rounded-3xl overflow-hidden border border-white/15 shadow-2xl space-y-3 p-4">
+            <div class="flex justify-between items-center px-2">
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded bg-red-600 text-white font-mono text-[9px] font-bold uppercase">TRAILER PREVIEW</span>
+                    <h3 id="trailer-title" class="text-sm font-bold text-white">Cyberpunk: Edgerunners Official 4K Teaser</h3>
+                </div>
+                <button onclick="closeTrailerModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-red-600 text-white flex items-center justify-center interactive-btn">
+                    <i class="fas fa-xmark text-xs"></i>
+                </button>
+            </div>
+            <div class="w-full aspect-video rounded-2xl overflow-hidden bg-black border border-white/10">
+                <video id="trailer-video-element" class="w-full h-full object-cover" controls playsinline>
+                    <source src="https://vjs.zencdn.net/v/oceans.mp4" type="video/mp4">
+                </video>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== CORRIDOR WEATHER RADAR MODAL ==================== -->
+    <div id="weather-modal" class="fixed inset-0 z-[9993] bg-black/85 backdrop-blur-xl hidden-page flex items-center justify-center p-4">
+        <div class="max-w-xl w-full glass-panel rounded-3xl p-6 border border-amber-500/30 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-white/10 pb-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg">
+                        <i class="fas fa-cloud-sun-rain"></i>
+                    </div>
+                    <div>
+                        <span class="text-[9px] font-mono text-amber-400 font-bold uppercase tracking-widest block">Satellite Telemetry</span>
+                        <h3 class="text-base font-bold text-white">Expressway Corridor Meteorological Radar</h3>
+                    </div>
+                </div>
+                <button onclick="closeWeatherModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center">
+                    <i class="fas fa-xmark text-xs"></i>
+                </button>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center font-mono text-xs">
+                <div class="p-3 rounded-xl bg-white/5">
+                    <span class="text-[9px] text-slate-400 block uppercase">Temperature</span>
+                    <span class="text-base font-bold text-amber-400">29.4°C</span>
+                </div>
+                <div class="p-3 rounded-xl bg-white/5">
+                    <span class="text-[9px] text-slate-400 block uppercase">Relative Humidity</span>
+                    <span class="text-base font-bold text-cyan-400">76%</span>
+                </div>
+                <div class="p-3 rounded-xl bg-white/5">
+                    <span class="text-[9px] text-slate-400 block uppercase">Surface Wind</span>
+                    <span class="text-base font-bold text-emerald-400">14 km/h SSW</span>
+                </div>
+                <div class="p-3 rounded-xl bg-white/5">
+                    <span class="text-[9px] text-slate-400 block uppercase">UV Index</span>
+                    <span class="text-base font-bold text-purple-400">Low (2.1)</span>
+                </div>
+            </div>
+            <div class="p-3 rounded-xl bg-black/40 border border-white/10 text-xs font-mono space-y-1">
+                <div class="flex justify-between text-slate-300"><span>Alor Setar:</span> <span class="text-emerald-400">Clear Skies (31°C)</span></div>
+                <div class="flex justify-between text-slate-300"><span>Gunung Semanggol:</span> <span class="text-amber-400">Scattered Clouds (29°C)</span></div>
+                <div class="flex justify-between text-slate-300"><span>Ipoh Corridor:</span> <span class="text-cyan-400">Gentle Showers (27°C)</span></div>
+                <div class="flex justify-between text-slate-300"><span>Kuala Lumpur TBS:</span> <span class="text-slate-200">Partly Cloudy (30°C)</span></div>
+            </div>
+            <button onclick="refreshGeoWeather()" class="interactive-btn w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded-xl uppercase">
+                <i class="fas fa-rotate mr-1.5"></i> Calibrate Atmospheric Sensors
+            </button>
+        </div>
+    </div>
+
+    <!-- ==================== REAL YOUTUBE APPLICATION MODAL ==================== -->
+    <div id="youtube-app-modal" class="fixed inset-0 z-[9994] bg-black/90 backdrop-blur-xl hidden-page flex flex-col justify-between p-4 md:p-8">
+        <div class="max-w-5xl mx-auto w-full flex flex-col h-full space-y-3">
+            <div class="flex items-center justify-between glass-panel px-4 py-3 rounded-2xl border border-red-600/30">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center text-lg shadow-md">
+                        <i class="fab fa-youtube"></i>
+                    </div>
+                    <div>
+                        <span class="text-[9px] font-mono text-red-500 uppercase tracking-widest font-bold">Onboard Video App</span>
+                        <h3 class="text-sm font-bold text-white">YouTube Stream Node</h3>
+                    </div>
+                </div>
+
+                <div class="hidden sm:flex items-center gap-2 flex-1 max-w-md mx-6">
+                    <input type="text" id="yt-custom-query" placeholder="Enter video link or ID (e.g. jfKfPfyJRdk)..." class="w-full px-3 py-1.5 rounded-xl bg-black/60 border border-white/10 text-white text-xs font-mono outline-none focus:border-red-500">
+                    <button onclick="loadCustomYouTubeVideo()" class="interactive-btn px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shrink-0">Play</button>
+                </div>
+
+                <button onclick="closeYouTubeApp()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-red-600 text-white flex items-center justify-center interactive-btn">
+                    <i class="fas fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 w-full rounded-2xl overflow-hidden bg-black border border-white/10 shadow-2xl relative">
+                <iframe id="yt-player-frame" class="w-full h-full" src="https://www.youtube-nocookie.com/embed/jfKfPfyJRdk?autoplay=1&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
+
+            <div class="glass-panel p-3 rounded-2xl border border-white/10 flex items-center gap-2 overflow-x-auto hide-scrollbar">
+                <span class="text-[11px] font-mono text-slate-400 font-bold uppercase shrink-0 mr-1">Trending:</span>
+                <button onclick="changeYouTubeVideo('jfKfPfyJRdk', 'Lofi Hip Hop Radio')" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-red-600/80 text-slate-200 text-xs font-mono shrink-0 transition-colors">
+                    <i class="fas fa-headphones mr-1 text-red-400"></i> Lofi Radio
+                </button>
+                <button onclick="changeYouTubeVideo('fJ9rUzIMcZQ', 'Queen - Bohemian Rhapsody')" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-red-600/80 text-slate-200 text-xs font-mono shrink-0 transition-colors">
+                    <i class="fas fa-music mr-1 text-purple-400"></i> Classic Hits
+                </button>
+                <button onclick="changeYouTubeVideo('kJQP7kiw5Fk', 'Top Global Music')" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-red-600/80 text-slate-200 text-xs font-mono shrink-0 transition-colors">
+                    <i class="fas fa-fire mr-1 text-amber-400"></i> Global Trending
+                </button>
+                <button onclick="changeYouTubeVideo('7NOSDKb0HlU', 'Cyberpunk Trailer')" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-red-600/80 text-slate-200 text-xs font-mono shrink-0 transition-colors">
+                    <i class="fas fa-gamepad mr-1 text-cyan-400"></i> Edgerunners
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== VIDEO PLAYER CONTAINER SYSTEM ==================== -->
+    <div id="video-container-root" class="fixed inset-0 z-[9990] bg-black hidden-page flex flex-col justify-between transition-all duration-300">
+        <div class="absolute top-0 inset-x-0 h-20 bg-gradient-to-b from-black/90 via-black/40 to-transparent z-40 flex items-center justify-between px-6 pointer-events-none">
+            <div class="flex items-center gap-3 pointer-events-auto">
+                <button onclick="toggleVideoMiniPlayer()" title="Mini Player" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white flex items-center justify-center backdrop-blur-md interactive-btn">
+                    <i class="fas fa-compress text-xs"></i>
+                </button>
+                <div class="flex flex-col">
+                    <span id="vp-badge" class="text-[9px] font-mono text-red-500 uppercase tracking-widest font-bold">4K HDR</span>
+                    <span id="vp-title" class="text-sm font-semibold text-white tracking-tight">Cyberpunk: Edgerunners</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2.5 pointer-events-auto">
+                <button onclick="toggleVideoSettingsModal()" title="Settings" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white flex items-center justify-center backdrop-blur-md interactive-btn">
+                    <i class="fas fa-sliders text-xs"></i>
+                </button>
+                <button onclick="closeVideoPlayer()" title="Exit Player" class="w-9 h-9 rounded-full bg-red-600/40 hover:bg-red-600 text-white flex items-center justify-center border border-red-500/50 backdrop-blur-md interactive-btn">
+                    <i class="fas fa-xmark text-xs"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="vp-subtitles-box" class="absolute bottom-28 inset-x-8 text-center pointer-events-none z-30 transition-all">
+            <span id="vp-subtitles-text" class="hidden px-4 py-1.5 rounded-lg bg-black/80 text-yellow-300 font-bold text-sm border border-yellow-400/20 backdrop-blur-md shadow-2xl"></span>
+        </div>
+
+        <div id="video-wrapper" class="w-full h-full flex items-center justify-center overflow-hidden fit-contain">
+            <video id="anix-video-element" class="video-js vjs-default-skin w-full h-full"></video>
+        </div>
+
+        <div id="vp-settings-modal" class="hidden absolute top-16 right-6 w-64 glass-panel p-4 rounded-2xl z-50 border border-white/15 space-y-3 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                <span class="text-[11px] font-mono uppercase tracking-wider text-slate-300 font-bold">Playback Settings</span>
+                <button onclick="toggleVideoSettingsModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times text-xs"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="text-[10px] text-slate-400 font-mono uppercase block mb-1">Quality</label>
+                    <select id="vp-quality-select" onchange="setVideoQuality(this.value)" class="w-full p-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs">
+                        <option value="4K">4K UHD Master (Bitrate 120 Mbps)</option>
+                        <option value="1080P" selected>1080p Enhanced (FSR Upgraded)</option>
+                        <option value="720P">720p Bandwidth Saver</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-400 font-mono uppercase block mb-1">Playback Speed</label>
+                    <div class="grid grid-cols-4 gap-1">
+                        <button onclick="setVideoSpeed(0.75)" class="py-1 rounded bg-white/5 hover:bg-white/15 text-slate-300 text-[11px] font-mono">0.75x</button>
+                        <button onclick="setVideoSpeed(1.0)" class="py-1 rounded bg-red-600 text-white text-[11px] font-mono">1.0x</button>
+                        <button onclick="setVideoSpeed(1.25)" class="py-1 rounded bg-white/5 hover:bg-white/15 text-slate-300 text-[11px] font-mono">1.25x</button>
+                        <button onclick="setVideoSpeed(1.5)" class="py-1 rounded bg-white/5 hover:bg-white/15 text-slate-300 text-[11px] font-mono">1.5x</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="absolute bottom-0 inset-x-0 h-24 bg-gradient-to-t from-black/95 via-black/50 to-transparent z-40 flex flex-col justify-end px-6 pb-5 pointer-events-none">
+            <div class="w-full flex items-center gap-3 pointer-events-auto mb-2">
+                <span id="vp-cur-time" class="text-[11px] font-mono text-slate-400 w-10 text-right">00:00</span>
+                <input type="range" id="vp-seek-bar" min="0" max="100" value="0" oninput="onVideoSeek(this.value)" class="custom-slider flex-1">
+                <span id="vp-dur-time" class="text-[11px] font-mono text-slate-400 w-10">00:00</span>
+            </div>
+
+            <div class="flex items-center justify-between pointer-events-auto">
+                <div class="flex items-center gap-2.5">
+                    <button onclick="toggleVideoPlay()" id="vp-play-btn" class="w-10 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-lg interactive-btn">
+                        <i class="fas fa-play text-xs ml-0.5"></i>
+                    </button>
+                    <button onclick="seekVideoRelative(-10)" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center interactive-btn">
+                        <i class="fas fa-rotate-left text-[11px]"></i>
+                    </button>
+                    <button onclick="seekVideoRelative(10)" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center interactive-btn">
+                        <i class="fas fa-rotate-right text-[11px]"></i>
+                    </button>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <button onclick="toggleVideoSubtitles()" id="vp-cc-btn" class="px-2.5 py-1 rounded-lg border border-white/20 bg-white/10 text-slate-300 text-xs font-mono font-medium interactive-btn">
+                        CC: <span id="vp-cc-status">OFF</span>
+                    </button>
+                    <button onclick="toggleVideoPiP()" title="Picture In Picture" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center interactive-btn">
+                        <i class="fas fa-clone text-[11px]"></i>
+                    </button>
+                    <button onclick="toggleVideoFullscreen()" title="Native Fullscreen" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center interactive-btn">
+                        <i class="fas fa-expand text-[11px]"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mini Floating Video PiP Box -->
+    <div id="video-mini-pip" class="hidden fixed bottom-28 right-6 w-64 h-40 bg-black rounded-xl border border-red-500/50 shadow-2xl z-[9995] overflow-hidden group">
+        <div class="absolute inset-0 z-20 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            <button onclick="toggleVideoPlay()" class="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center"><i class="fas fa-play text-xs"></i></button>
+            <button onclick="expandVideoMiniPlayer()" class="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center"><i class="fas fa-expand text-xs"></i></button>
+            <button onclick="closeVideoPlayer()" class="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-red-600"><i class="fas fa-times text-xs"></i></button>
+        </div>
+        <div id="video-pip-mount" class="w-full h-full"></div>
+    </div>
+
+    <!-- ==================== FLOATING MUSIC DOCK ==================== -->
+    <div id="music-mini-bar" class="hidden fixed bottom-24 inset-x-4 max-w-xl mx-auto glass-panel p-2.5 rounded-2xl z-[450] border border-purple-500/30 shadow-2xl flex items-center justify-between">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="openMusicFullPlayer()">
+            <div class="relative w-11 h-11 rounded-xl overflow-hidden bg-purple-900 shrink-0 border border-purple-400/30">
+                <img id="music-mini-cover" src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300&q=80" class="w-full h-full object-cover">
+                <div id="mini-spin-disk" class="absolute inset-0 rounded-full border-2 border-dashed border-white/40 playing-disk paused-disk"></div>
+            </div>
+            <div class="flex flex-col max-w-[150px] sm:max-w-xs">
+                <span id="music-mini-title" class="text-xs font-semibold text-white truncate">Eclipsa Resonance Pulse</span>
+                <span id="music-mini-artist" class="text-[10px] font-mono text-purple-300 truncate">Platinum Audio Labs</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button onclick="toggleMusicPlay()" id="music-mini-play-btn" class="w-8 h-8 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-md">
+                <i class="fas fa-play text-xs"></i>
+            </button>
+            <button onclick="openMusicFullPlayer()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center">
+                <i class="fas fa-up-right-and-down-left-from-center text-[10px]"></i>
+            </button>
+            <button onclick="closeMusicMiniPlayer()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-red-500/50 text-slate-400 hover:text-white flex items-center justify-center">
+                <i class="fas fa-times text-[10px]"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- ==================== FULL MUSIC PLAYER MODAL ==================== -->
+    <div id="music-full-modal" class="fixed inset-0 z-[9992] bg-gradient-to-b from-[#140b20] via-[#09060f] to-black hidden-page flex flex-col justify-between p-6 md:p-10 overflow-y-auto">
+        <div class="flex items-center justify-between">
+            <button onclick="closeMusicFullPlayer()" class="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center interactive-btn">
+                <i class="fas fa-chevron-down text-sm"></i>
+            </button>
+            <div class="text-center">
+                <span class="text-[9px] font-mono text-purple-400 uppercase tracking-widest block font-bold">IAMF 3D Master</span>
+                <span class="text-xs font-bold text-white">Spatial Cabin Audio</span>
+            </div>
+            <button onclick="showPage('settings-page'); closeMusicFullPlayer();" class="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center interactive-btn">
+                <i class="fas fa-sliders text-xs"></i>
+            </button>
+        </div>
+
+        <div class="flex flex-col items-center justify-center my-auto py-6">
+            <div class="relative w-56 h-56 md:w-72 md:h-72 rounded-full border-4 border-purple-500/20 p-2 shadow-[0_0_50px_rgba(147,51,234,0.25)]">
+                <div id="music-full-disc" class="w-full h-full rounded-full overflow-hidden relative shadow-2xl playing-disk paused-disk">
+                    <img id="music-full-cover" src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=600&q=80" class="w-full h-full object-cover">
+                    <div class="absolute inset-0 m-auto w-10 h-10 rounded-full bg-black border-4 border-slate-700 flex items-center justify-center">
+                        <div class="w-2.5 h-2.5 rounded-full bg-purple-500"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-6 space-y-0.5">
+                <h3 id="music-full-title" class="text-xl font-bold text-white tracking-tight">Eclipsa Resonance Pulse</h3>
+                <p id="music-full-artist" class="text-xs font-mono text-purple-300">Platinum Audio Labs</p>
+            </div>
+        </div>
+
+        <div class="max-w-md mx-auto w-full space-y-4">
+            <div class="space-y-1">
+                <input type="range" id="music-seek-bar" min="0" max="100" value="0" oninput="onMusicSeek(this.value)" class="custom-slider custom-slider-purple w-full">
+                <div class="flex justify-between text-[11px] font-mono text-slate-400">
+                    <span id="music-cur-time">00:00</span>
+                    <span id="music-profile-tag" class="text-purple-400 font-medium">24-Bit / 96kHz Lossless</span>
+                    <span id="music-dur-time">03:45</span>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between px-4">
+                <button onclick="toggleMusicShuffle()" id="music-shuffle-btn" class="text-slate-400 hover:text-purple-400"><i class="fas fa-shuffle text-sm"></i></button>
+                <button onclick="prevMusicTrack()" class="text-white hover:text-purple-400 text-lg"><i class="fas fa-backward-step"></i></button>
+                <button onclick="toggleMusicPlay()" id="music-full-play-btn" class="w-14 h-14 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center text-lg shadow-lg interactive-btn">
+                    <i class="fas fa-play ml-0.5"></i>
+                </button>
+                <button onclick="nextMusicTrack()" class="text-white hover:text-purple-400 text-lg"><i class="fas fa-forward-step"></i></button>
+                <button onclick="toggleMusicRepeat()" id="music-repeat-btn" class="text-slate-400 hover:text-purple-400"><i class="fas fa-repeat text-sm"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="anix-audio-node" preload="auto"></audio>
+
+    <!-- ==================== STREAMLINED TOP NAVIGATION ==================== -->
+    <nav class="sticky top-0 z-[100] glass-panel border-x-0 border-t-0 h-[66px] flex items-center px-4 md:px-8">
+        <div class="max-w-7xl mx-auto w-full flex justify-between items-center">
+            <!-- Brand & Location Telemetry -->
+            <div class="flex items-center gap-3">
+                <a href="javascript:void(0)" onclick="showPage('main-dashboard')" class="text-base md:text-xl font-black text-white flex items-center tracking-tight">
+                    <div class="w-8 h-8 bg-gradient-to-br from-red-600 to-purple-700 rounded-lg flex items-center justify-center mr-2 shadow-md">
+                        <i class="fas fa-cubes text-white text-xs"></i>
+                    </div>
+                    ANIX <span class="ml-1.5 text-[8px] md:text-[9px] font-mono text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded bg-cyan-950/40">SUITE v6.0</span>
+                </a>
+
+                <div onclick="openWeatherModal()" title="View Expressway Weather Radar" class="hidden sm:flex items-center gap-2 bg-white/5 hover:bg-white/10 cursor-pointer px-2.5 py-1.5 rounded-lg border border-white/10 interactive-btn">
+                    <i id="weather-icon" class="fas fa-sun text-amber-500 text-xs"></i>
+                    <div class="flex flex-col text-left">
+                        <span id="weather-temp" class="text-xs font-bold text-white leading-none">29°C</span>
+                        <span id="weather-city" class="text-[8px] font-mono text-slate-400 uppercase leading-tight mt-0.5">Penang Corridor</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sleek Clean Utility Controls -->
+            <div class="flex items-center gap-2">
+                <!-- Passenger Memory Profile Badge -->
+                <button onclick="showPage('membership-page')" class="interactive-btn px-2.5 py-1.5 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/30 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5">
+                    <i class="fas fa-crown text-amber-400 text-[10px]"></i>
+                    <span id="nav-user-alias" class="hidden sm:inline">Amir • PLATINUM</span>
+                </button>
+
+                <!-- Local Payment & Cart -->
+                <button onclick="showPage('payment-page')" class="interactive-btn relative px-2.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-black border border-emerald-500/30 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5">
+                    <i class="fas fa-receipt text-emerald-400 text-xs"></i>
+                    <span class="hidden md:inline">PAY / BILLS</span>
+                </button>
+
+                <!-- Settings Hub -->
+                <button onclick="showPage('settings-page')" title="Player & System Settings" class="interactive-btn w-8 h-8 bg-white/5 hover:bg-white/15 text-slate-300 border border-white/10 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-sliders text-xs text-cyan-400"></i>
+                </button>
+
+                <!-- Admin Protected by PIN -->
+                <button onclick="checkAdminAccess()" title="Admin Terminal (PIN Protected)" class="interactive-btn w-8 h-8 bg-white/5 hover:bg-white/15 text-slate-300 border border-white/10 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-shield-halved text-xs text-amber-400"></i>
+                </button>
+
+                <!-- Emergency SOS -->
+                <button onclick="triggerSOS()" title="Highway Emergency SOS" class="interactive-btn w-8 h-8 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-triangle-exclamation text-xs"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ==================== MAIN CONTENT WRAPPER ==================== -->
+    <main class="max-w-7xl mx-auto px-4 md:px-8 pt-4 relative z-10 space-y-6">
+
+        <!-- ==================== 1. HOMEPAGE: CLEAN EXECUTIVE SUITE ==================== -->
+        <section id="main-dashboard" class="page-view space-y-5">
+            
+            <!-- REALISTIC STREAMLINED HERO STAGE -->
+            <div class="relative overflow-hidden rounded-3xl glass-panel border border-white/10 p-6 md:p-8 flex flex-col justify-between min-h-[260px] shadow-2xl">
+                <div id="threejs-canvas-container"></div>
+                
+                <!-- Live Telemetry Status Bar -->
+                <div class="relative z-20 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3.5">
+                    <div class="flex items-center gap-3">
+                        <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono text-[10px] font-semibold flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Pod #04A Active
+                        </span>
+                        <span class="text-xs font-mono text-slate-300">Transit: Alor Setar → KL Sentral</span>
+                    </div>
+
+                    <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+                        <span>Speed: <strong class="text-white">94 km/h</strong></span>
+                        <span class="hidden sm:inline">Lux: <strong id="lux-sensor-val" class="text-cyan-400">Auto Sensor</strong></span>
+                        <span>ETA: <strong class="text-white">13:30</strong></span>
+                    </div>
+                </div>
+
+                <!-- Showcase Text -->
+                <div class="relative z-20 py-3 max-w-2xl space-y-1.5">
+                    <span class="text-[10px] font-mono text-cyan-400 uppercase tracking-widest font-semibold block">Executive Passenger Suite</span>
+                    <h1 class="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight font-display">
+                        In-Flight Entertainment & Transit Portal
+                    </h1>
+                    <p class="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
+                        Direct Measat-3b Malaysia satellite TV feeds, YouTube streaming, in-seat gourmet dining, and lossless 3D spatial acoustics.
+                    </p>
+                </div>
+
+                <!-- Action Button Row with Trailer Launch -->
+                <div class="relative z-20 flex flex-wrap items-center gap-2.5 pt-2">
+                    <button onclick="startVideoEngine('https://vjs.zencdn.net/v/oceans.mp4', 'Cyberpunk: Edgerunners', 'Sci-Fi / Anime')" class="interactive-btn px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs rounded-xl flex items-center gap-2 shadow-md">
+                        <i class="fas fa-play text-xs"></i> Resume Cinema
+                    </button>
+                    <button onclick="openTrailerModal('https://vjs.zencdn.net/v/oceans.mp4', 'Cyberpunk: Edgerunners (Official 4K Trailer)')" class="interactive-btn px-4 py-2.5 bg-purple-600/30 hover:bg-purple-600 text-purple-300 hover:text-white font-semibold text-xs rounded-xl border border-purple-500/40 flex items-center gap-2">
+                        <i class="fas fa-film text-xs"></i> Watch 4K Trailer
+                    </button>
+                    <button onclick="showPage('livetv-page')" class="interactive-btn px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs rounded-xl flex items-center gap-2 shadow-md">
+                        <i class="fas fa-satellite-dish text-xs"></i> Measat Live TV
+                    </button>
+                    <button onclick="showPage('fnb-page')" class="interactive-btn px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs rounded-xl border border-white/10 flex items-center gap-2">
+                        <i class="fas fa-utensils text-xs text-amber-400"></i> Seat Dining
+                    </button>
+                    <button onclick="callCabinAttendant()" class="interactive-btn px-3.5 py-2.5 bg-white/10 hover:bg-red-600 text-slate-200 hover:text-white rounded-xl text-xs border border-white/10 flex items-center gap-1.5 ml-auto">
+                        <i class="fas fa-bell text-xs"></i> Attendant
+                    </button>
+                </div>
+            </div>
+
+            <!-- CLEAN 7-APP LAUNCHER TRAY -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5 sm:gap-3">
+                <div onclick="openYouTubeApp()" class="hero-app-tile group border-red-500/20 hover:border-red-500/50">
+                    <div class="hero-app-icon bg-red-600/20 border border-red-500/30 text-red-500"><i class="fab fa-youtube"></i></div>
+                    <span class="text-xs font-semibold text-white group-hover:text-red-400">YouTube</span>
+                    <span class="text-[9px] font-mono text-slate-400">Video App</span>
+                </div>
+
+                <div onclick="showPage('livetv-page')" class="hero-app-tile group border-amber-500/20 hover:border-amber-500/50">
+                    <div class="hero-app-icon bg-amber-500/20 border border-amber-500/30 text-amber-400"><i class="fas fa-satellite-dish"></i></div>
+                    <span class="text-xs font-semibold text-white group-hover:text-amber-400">Live TV</span>
+                    <span class="text-[9px] font-mono text-slate-400">10 MY Feeds</span>
+                </div>
+
+                <div onclick="showPage('fnb-page')" class="hero-app-tile group border-emerald-500/20 hover:border-emerald-500/50">
+                    <div class="hero-app-icon bg-emerald-500/20 border border-emerald-500/30 text-emerald-400"><i class="fas fa-burger"></i></div>
+                    <span class="text-xs font-semibold text-white group-hover:text-emerald-400">Seat Dining</span>
+                    <span class="text-[9px] font-mono text-slate-400">Fresh Galley</span>
+                </div>
+
+                <div onclick="showPage('cinema-page')" class="hero-app-tile group border-purple-500/20 hover:border-purple-500/50">
+                    <div class="hero-app-icon bg-purple-600/20 border border-purple-500/30 text-purple-400"><i class="fas fa-film"></i></div>
+                    <span class="text-xs font-semibold text-white group-hover:text-purple-400">Cinema Hub</span>
+                    <span class="text-[9px] font-mono text-slate-400">4K Movies</span>
+                </div>
+
+                <div onclick="showPage('cabin-page')" class="hero-app-tile group border-cyan-500/20 hover:border-cyan-500/50">
+                    <div class="hero-app-icon bg-cyan-500/20 border border-cyan-500/30 text-cyan-400"><i class="fas fa-couch"></i></div>
+                    <span class="text-xs font-semibold text-white group-hover:text-cyan-400">Pod Suite</span>
+                    <span class="text-[9px] font-mono text-slate-400">Climate & Light</span>
+                </div>
+
+                <div onclick="showPage('wifi-page')" class="hero-app-tile group border-blue-500/20 hover:border-blue-500/50">
+                    <div class="hero-app-icon bg-blue-500/20 border border-blue-500/30 text-blue-400"><i class="fas fa-wifi"></i></div>
+                    <span class="text-xs font-semibold text-white group-hover:text-blue-400">Starlink 5G</span>
+                    <span class="text-[9px] font-mono text-slate-400">380 Mbps Pass</span>
+                </div>
+
+                <div onclick="showPage('extensions-page')" class="hero-app-tile group border-emerald-500/20 hover:border-emerald-400">
+                    <div class="hero-app-icon bg-emerald-500/30 text-emerald-400 border border-emerald-400/30"><i class="fas fa-puzzle-piece"></i></div>
+                    <span class="text-xs font-semibold text-white group-hover:text-emerald-400">Extensions</span>
+                    <span class="text-[9px] font-mono text-slate-400">Add-ons Store</span>
+                </div>
+            </div>
+
+            <!-- PROMOTIONS & ADVERTISING SLIDESHOW -->
+            <div class="glass-panel p-3.5 rounded-2xl border border-white/10 flex flex-col justify-between gap-2">
+                <div class="flex justify-between items-center">
+                    <span class="text-[10px] font-mono text-amber-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                        <i class="fas fa-sparkles"></i> Executive Onboard Highlights
+                    </span>
+                    <div class="flex items-center gap-1">
+                        <button onclick="prevAdSlide()" class="w-6 h-6 rounded-full bg-white/5 hover:bg-white/15 text-slate-300 flex items-center justify-center text-[10px]"><i class="fas fa-chevron-left"></i></button>
+                        <button onclick="nextAdSlide()" class="w-6 h-6 rounded-full bg-white/5 hover:bg-white/15 text-slate-300 flex items-center justify-center text-[10px]"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+
+                <div class="relative min-h-[50px]">
+                    <div class="ad-slide active flex items-center justify-between gap-3 cursor-pointer py-1" onclick="showPage('fnb-page')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-sm shrink-0"><i class="fas fa-utensils"></i></div>
+                            <div>
+                                <h4 class="text-xs font-bold text-white">In-Seat Express Dining Special: 20% Off Combos</h4>
+                                <p class="text-[11px] text-slate-400">Order fresh Sambal Sotong & Cold Brew Arabica delivered directly to Pod #04A.</p>
+                            </div>
+                        </div>
+                        <span class="hidden sm:inline-block px-3 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-mono font-semibold">View Menu</span>
+                    </div>
+
+                    <div class="ad-slide flex items-center justify-between gap-3 cursor-pointer py-1" onclick="openYouTubeApp()">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-lg bg-red-600/20 text-red-400 flex items-center justify-center text-sm shrink-0"><i class="fab fa-youtube"></i></div>
+                            <div>
+                                <h4 class="text-xs font-bold text-white">Unlimited YouTube Streaming with Starlink High-Speed</h4>
+                                <p class="text-[11px] text-slate-400">Enjoy unmetered YouTube video and music streaming throughout the journey.</p>
+                            </div>
+                        </div>
+                        <span class="hidden sm:inline-block px-3 py-1 rounded-lg bg-red-600/20 text-red-300 text-xs font-mono font-semibold">Launch App</span>
+                    </div>
+
+                    <div class="ad-slide flex items-center justify-between gap-3 cursor-pointer py-1" onclick="showPage('livetv-page')">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-sm shrink-0"><i class="fas fa-satellite"></i></div>
+                            <div>
+                                <h4 class="text-xs font-bold text-white">Measat-3b Malaysia Satellite TV Live Feeds Active</h4>
+                                <p class="text-[11px] text-slate-400">Direct satellite connection to TV1, TV3, Astro Awani 501, and Sukan RTM HD.</p>
+                            </div>
+                        </div>
+                        <span class="hidden sm:inline-block px-3 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 text-xs font-mono font-semibold">Watch Now</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-center gap-1 pt-1">
+                    <div class="ad-dot w-5 h-1 rounded-full bg-cyan-400 transition-all"></div>
+                    <div class="ad-dot w-1.5 h-1 rounded-full bg-white/20 transition-all"></div>
+                    <div class="ad-dot w-1.5 h-1 rounded-full bg-white/20 transition-all"></div>
+                </div>
+            </div>
+
+            <!-- TWO BALANCED DASHBOARD PANELS (TRANSIT RADAR & POD ROTARY VOLUME) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                <!-- Journey Status Box (Span 7) -->
+                <div class="lg:col-span-7 glass-panel p-5 rounded-2xl space-y-3">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fas fa-location-arrow text-emerald-400 text-sm"></i>
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Highway Transit Telemetry</h3>
+                        </div>
+                        <span class="text-xs font-mono text-emerald-400 font-semibold">68% Traversed</span>
+                    </div>
+
+                    <div class="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                        <div class="bg-gradient-to-r from-emerald-500 via-cyan-400 to-purple-500 h-full w-[68%] rounded-full"></div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 text-center font-mono text-xs pt-1">
+                        <div class="p-2 rounded-xl bg-white/5">
+                            <span class="text-[9px] text-slate-400 block">CURRENT</span>
+                            <span class="font-bold text-white">94 km/h</span>
+                        </div>
+                        <div class="p-2 rounded-xl bg-white/5">
+                            <span class="text-[9px] text-slate-400 block">NEXT REFRESHMENT</span>
+                            <span class="font-bold text-amber-400">Gunung Semanggol</span>
+                        </div>
+                        <div class="p-2 rounded-xl bg-white/5">
+                            <span class="text-[9px] text-slate-400 block">DESTINATION ETA</span>
+                            <span class="font-bold text-white">13:30 (1H 24M)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pod Comfort & Master Rotary Volume (Span 5) -->
+                <div class="lg:col-span-5 glass-panel p-5 rounded-2xl flex flex-col justify-between space-y-4">
+                    <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                        <div>
+                            <span class="text-[9px] font-mono text-purple-400 uppercase font-bold tracking-wider block">In-Seat Controls</span>
+                            <h3 class="text-xs font-bold text-white">Pod #04A Audio & Lighting</h3>
+                        </div>
+                        <button onclick="toggleDND()" id="quick-dnd-btn" class="px-2 py-0.5 rounded-md bg-white/10 text-[10px] font-mono font-medium text-slate-300">DND: OFF</button>
+                    </div>
+
+                    <!-- Rotary Volume Dial -->
+                    <div class="flex flex-col items-center justify-center my-2">
+                        <div class="relative w-24 h-24 select-none" id="volume-knob-container">
+                            <svg viewBox="0 0 100 100" class="w-full h-full absolute inset-0 -rotate-[135deg]">
+                                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8" stroke-linecap="round" />
+                                <circle id="volume-ring" cx="50" cy="50" r="42" fill="none" stroke="url(#vol-grad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264" class="transition-[stroke-dashoffset] duration-75" />
+                                <defs>
+                                    <linearGradient id="vol-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#E50914" />
+                                        <stop offset="100%" stop-color="#6D28D9" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+
+                            <div class="absolute inset-2 rounded-full bg-gradient-to-br from-slate-800 to-black shadow-lg border border-slate-700/60 flex justify-center items-center cursor-grab active:cursor-grabbing z-10" id="volume-knob">
+                                <div class="absolute inset-0 flex justify-center origin-center transition-transform duration-75" id="volume-indicator" style="transform: rotate(-135deg);">
+                                    <div class="w-1.5 h-3 bg-red-500 rounded-full shadow-sm mt-1"></div>
+                                </div>
+                                <div class="text-sm font-bold text-white font-mono z-20 pointer-events-none" id="volume-text">50%</div>
+                            </div>
+                        </div>
+                        <span class="text-[9px] text-slate-500 font-mono mt-0.5">Master Headrest Transducer Gain</span>
+                    </div>
+
+                    <!-- Ambient Mood Swatches -->
+                    <div class="space-y-2 pt-2 border-t border-white/10 text-xs">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400 font-mono text-[11px]">Mood Glow:</span>
+                            <div class="flex gap-1.5">
+                                <button onclick="setMoodGlow('rgba(109, 40, 217, 0.25)', 'Cyber Purple')" class="w-5 h-5 rounded-full bg-purple-600 border border-purple-400/50" title="Purple"></button>
+                                <button onclick="setMoodGlow('rgba(0, 240, 255, 0.25)', 'Neon Cyan')" class="w-5 h-5 rounded-full bg-cyan-400 border border-cyan-200/50" title="Cyan"></button>
+                                <button onclick="setMoodGlow('rgba(245, 158, 11, 0.25)', 'Sunset Amber')" class="w-5 h-5 rounded-full bg-amber-500 border border-amber-300/50" title="Amber"></button>
+                                <button onclick="setMoodGlow('rgba(16, 185, 129, 0.25)', 'Emerald Lounge')" class="w-5 h-5 rounded-full bg-emerald-500 border border-emerald-300/50" title="Emerald"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 2. PASSENGER MEMBERSHIP PROFILE PAGE ==================== -->
+        <section id="membership-page" class="page-view hidden-page space-y-5">
+            <div class="rounded-3xl glass-panel border border-purple-500/30 p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div class="space-y-1">
+                    <span class="px-2.5 py-0.5 bg-purple-500/20 border border-purple-500/40 text-purple-300 text-[9px] font-mono font-bold uppercase rounded-full">Frequent Traveler Memory Node</span>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Passenger Profile & Memory Vault</h2>
+                    <p class="text-slate-400 text-xs">Saved pod ergonomics, reward mileage points, and synchronized comfort parameters.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="saveProfilePreferences()" class="interactive-btn px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider">
+                        <i class="fas fa-floppy-disk mr-1"></i> Save to Pod Memory
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                <!-- Membership Card (Span 5) -->
+                <div class="lg:col-span-5 glass-panel p-6 rounded-3xl border border-purple-500/30 space-y-4 relative overflow-hidden">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-mono text-purple-300 font-bold uppercase tracking-wider">PLATINUM HYBRID PASS</span>
+                        <i class="fas fa-crown text-amber-400 text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400 font-mono">PASSENGER NAME</div>
+                        <input id="profile-name-input" type="text" value="Amir Fakhri" class="bg-transparent text-xl font-black text-white outline-none w-full border-b border-white/10 focus:border-purple-500 py-1">
+                    </div>
+                    <div class="flex justify-between font-mono text-xs pt-2">
+                        <div>
+                            <span class="text-[9px] text-slate-400 block">MEMBER ID</span>
+                            <span class="text-white font-bold">ANX-9824-MY</span>
+                        </div>
+                        <div>
+                            <span class="text-[9px] text-slate-400 block">ANIX MILES</span>
+                            <span class="text-amber-400 font-bold">14,850 PTS</span>
+                        </div>
+                        <div>
+                            <span class="text-[9px] text-slate-400 block">ASSIGNED POD</span>
+                            <span class="text-cyan-400 font-bold">#04A WINDOW</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Memory Preferences (Span 7) -->
+                <div class="lg:col-span-7 glass-panel p-6 rounded-3xl space-y-4">
+                    <h3 class="text-xs font-mono uppercase tracking-wider text-slate-300 font-bold">Saved In-Pod Preferences</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div class="p-3 rounded-xl bg-white/5 space-y-1">
+                            <span class="text-slate-400 block">Default Audio Processing:</span>
+                            <select id="pref-audio-mode" class="w-full p-2 rounded bg-black/60 border border-white/10 text-white text-xs">
+                                <option value="Binaural 3D Virtual">Binaural 3D Virtual</option>
+                                <option value="Studio Master 24-Bit / 96kHz">Studio Master 24-Bit / 96kHz</option>
+                                <option value="Sub-Bass Cabin Booster">Sub-Bass Cabin Booster</option>
+                            </select>
+                        </div>
+                        <div class="p-3 rounded-xl bg-white/5 space-y-1">
+                            <span class="text-slate-400 block">Ambient Lighting Tint:</span>
+                            <select id="pref-light-color" class="w-full p-2 rounded bg-black/60 border border-white/10 text-white text-xs">
+                                <option value="Cyber Purple">Cyber Purple</option>
+                                <option value="Neon Cyan">Neon Cyan</option>
+                                <option value="Sunset Amber">Sunset Amber</option>
+                                <option value="Emerald Lounge">Emerald Lounge</option>
+                            </select>
+                        </div>
+                        <div class="p-3 rounded-xl bg-white/5 space-y-1">
+                            <span class="text-slate-400 block">Default Subtitles:</span>
+                            <select id="pref-subtitles" class="w-full p-2 rounded bg-black/60 border border-white/10 text-white text-xs">
+                                <option value="English (SDH)">English (SDH)</option>
+                                <option value="Bahasa Malaysia">Bahasa Malaysia</option>
+                                <option value="Off">Off</option>
+                            </select>
+                        </div>
+                        <div class="p-3 rounded-xl bg-white/5 space-y-1">
+                            <span class="text-slate-400 block">Auto Sensor Adaptation:</span>
+                            <select id="pref-auto-lum" class="w-full p-2 rounded bg-black/60 border border-white/10 text-white text-xs">
+                                <option value="Enabled">Enabled (Ambient Lux Tracking)</option>
+                                <option value="Disabled">Disabled</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 3. LOCAL PAYMENT GATEWAY & DIGITAL RECEIPTS ==================== -->
+        <section id="payment-page" class="page-view hidden-page space-y-5">
+            <div class="rounded-3xl glass-panel border border-emerald-500/30 p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div class="space-y-1">
+                    <span class="px-2.5 py-0.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[9px] font-mono font-bold uppercase rounded-full">Secure Local Gateway</span>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Onboard Payments & Invoicing Terminal</h2>
+                    <p class="text-slate-400 text-xs">Instant contactless payments for seat dining, premium streaming passes, and official digital tax receipts.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-1 rounded bg-emerald-950 border border-emerald-500/30 text-emerald-400 font-mono text-xs">
+                        <i class="fas fa-lock mr-1"></i> 256-Bit SSL Bus Mesh
+                    </span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                <!-- Payment Terminal (Span 7) -->
+                <div class="lg:col-span-7 glass-panel p-6 rounded-3xl space-y-4">
+                    <h3 class="text-xs font-mono uppercase tracking-wider text-slate-300 font-bold">1. Select Local Payment Channel</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <button onclick="setPaymentMethod('DuitNow QR')" class="pay-method-btn active p-3 rounded-xl bg-emerald-600/30 border border-emerald-500/50 text-white text-xs font-mono font-bold flex flex-col items-center gap-1.5">
+                            <i class="fas fa-qrcode text-lg text-emerald-400"></i> DuitNow QR
+                        </button>
+                        <button onclick="setPaymentMethod('Touch n Go eWallet')" class="pay-method-btn p-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 text-xs font-mono font-bold flex flex-col items-center gap-1.5">
+                            <i class="fas fa-wallet text-lg text-blue-400"></i> TnG eWallet
+                        </button>
+                        <button onclick="setPaymentMethod('FPX Online Banking')" class="pay-method-btn p-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 text-xs font-mono font-bold flex flex-col items-center gap-1.5">
+                            <i class="fas fa-building-columns text-lg text-amber-400"></i> FPX Online
+                        </button>
+                        <button onclick="setPaymentMethod('Credit / Debit Card')" class="pay-method-btn p-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 text-xs font-mono font-bold flex flex-col items-center gap-1.5">
+                            <i class="fas fa-credit-card text-lg text-purple-400"></i> Card / NFC
+                        </button>
+                    </div>
+
+                    <!-- Payment Details Form -->
+                    <div class="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3 font-mono text-xs">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400">Selected Gateway:</span>
+                            <span id="selected-gateway-label" class="text-emerald-400 font-bold">DuitNow National QR</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400">Payee Pod:</span>
+                            <span class="text-white font-bold">Pod #04A (Executive Seat)</span>
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-white/10">
+                            <span class="text-slate-300">Outstanding Balance:</span>
+                            <span id="gateway-payable-amount" class="text-xl font-bold text-amber-400">RM 24.00</span>
+                        </div>
+                    </div>
+
+                    <button onclick="executePaymentTransaction()" class="interactive-btn w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg">
+                        Authorize Payment & Generate Official Receipt
+                    </button>
+                </div>
+
+                <!-- Digital Receipt Canvas Area (Span 5) -->
+                <div class="lg:col-span-5 glass-panel p-6 rounded-3xl border border-white/15 space-y-3 flex flex-col justify-between" id="receipt-print-area">
+                    <div class="border-b-2 border-dashed border-white/20 pb-3 text-center space-y-1">
+                        <div class="text-sm font-black tracking-tighter text-white">ANIX EXPRESS HYBRID TRANSIT</div>
+                        <div class="text-[10px] font-mono text-slate-400">MALAYSIA SST REG: W10-2409-32000412</div>
+                        <div class="text-[9px] font-mono text-emerald-400 font-bold">OFFICIAL DIGITAL TAX INVOICE</div>
+                    </div>
+
+                    <div class="space-y-1.5 text-xs font-mono py-2">
+                        <div class="flex justify-between text-slate-400"><span>INVOICE NO:</span> <span class="text-white" id="rcpt-no">INV-2026-9812</span></div>
+                        <div class="flex justify-between text-slate-400"><span>DATE & TIME:</span> <span class="text-white" id="rcpt-time">06/09/2026 23:05</span></div>
+                        <div class="flex justify-between text-slate-400"><span>PAYMENT METHOD:</span> <span class="text-emerald-400 font-bold" id="rcpt-method">DuitNow QR</span></div>
+                        <div class="flex justify-between text-slate-400"><span>SEAT / POD:</span> <span class="text-white">Pod #04A</span></div>
+                        
+                        <div class="pt-2 border-t border-white/10 space-y-1" id="rcpt-items-list">
+                            <div class="flex justify-between text-slate-300"><span>1x Nasi Lemak Sambal Sotong</span> <span>RM 14.50</span></div>
+                            <div class="flex justify-between text-slate-300"><span>1x Cold Brew Arabica</span> <span>RM 9.50</span></div>
+                        </div>
+
+                        <div class="flex justify-between items-center pt-2 border-t-2 border-dashed border-white/20 text-sm font-bold">
+                            <span class="text-white">TOTAL PAID (INCL. 6% SST):</span>
+                            <span class="text-amber-400" id="rcpt-total">RM 24.00</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-white/10 flex items-center justify-between">
+                        <button onclick="window.print()" class="interactive-btn px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-mono">
+                            <i class="fas fa-print mr-1"></i> Print / PDF
+                        </button>
+                        <span class="text-[9px] font-mono text-emerald-400 font-bold uppercase"><i class="fas fa-check-circle mr-1"></i> Verified Authentic</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 4. SYSTEM INFORMATION & TELEMETRY PAGE ==================== -->
+        <section id="sysinfo-page" class="page-view hidden-page space-y-5">
+            <div class="rounded-3xl glass-panel border border-cyan-500/30 p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div class="space-y-1">
+                    <span class="px-2.5 py-0.5 bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 text-[9px] font-mono font-bold uppercase rounded-full">Hardware & Sensor Matrix</span>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Onboard System Architecture</h2>
+                    <p class="text-slate-400 text-xs">Complete diagnostics of host coach compute units, satellite transponders, and power rail telemetry.</p>
+                </div>
+                <div class="flex items-center gap-2 font-mono text-xs text-emerald-400">
+                    <i class="fas fa-circle-check"></i> All Subsystems Green
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+                <div class="glass-card p-4 rounded-2xl space-y-1 border-l-4 border-l-cyan-500">
+                    <span class="text-[9px] font-mono text-slate-400 uppercase">OS KERNEL</span>
+                    <div class="text-sm font-bold text-white">AnixOS 6.8.4-bus</div>
+                    <span class="text-[10px] text-slate-500">Realtime Preempt Hybrid</span>
+                </div>
+                <div class="glass-card p-4 rounded-2xl space-y-1 border-l-4 border-l-purple-500">
+                    <span class="text-[9px] font-mono text-slate-400 uppercase">SATELLITE TUNER</span>
+                    <div class="text-sm font-bold text-purple-300">Measat-3b Ku-Band</div>
+                    <span class="text-[10px] text-slate-500">11.5 GHz Transponder Locked</span>
+                </div>
+                <div class="glass-card p-4 rounded-2xl space-y-1 border-l-4 border-l-emerald-500">
+                    <span class="text-[9px] font-mono text-slate-400 uppercase">CABIN COMPUTATION</span>
+                    <div class="text-sm font-bold text-emerald-400">Quad-Core APU @ 3.4GHz</div>
+                    <span class="text-[10px] text-slate-500">Load: 18% • Temp: 42°C</span>
+                </div>
+                <div class="glass-card p-4 rounded-2xl space-y-1 border-l-4 border-l-amber-500">
+                    <span class="text-[9px] font-mono text-slate-400 uppercase">DC VOLTAGE RAIL</span>
+                    <div class="text-sm font-bold text-amber-300">24.2V Coach Bus Power</div>
+                    <span class="text-[10px] text-slate-500">Alternator Stable (Ripple &lt; 0.1V)</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 5. EXTENSIONS & PLUGINS STORE ==================== -->
+        <section id="extensions-page" class="page-view hidden-page space-y-5">
+            <div class="rounded-3xl glass-panel border border-emerald-500/30 p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div class="space-y-1">
+                    <span class="px-2.5 py-0.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[9px] font-mono font-bold uppercase rounded-full">Modular Add-on Ecosystem</span>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Onboard Extensions & Plugins</h2>
+                    <p class="text-slate-400 text-xs">Enable enhanced transit modules directly inside your personal in-seat display.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="glass-card p-5 rounded-2xl space-y-3 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-white">Dual Subtitle Sync</span>
+                            <input type="checkbox" checked class="accent-emerald-500 w-4 h-4">
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2">Display simultaneous English and Bahasa Malaysia subtitles during movie playback.</p>
+                    </div>
+                    <span class="text-[10px] font-mono text-emerald-400 font-bold">INSTALLED (v1.4)</span>
+                </div>
+
+                <div class="glass-card p-5 rounded-2xl space-y-3 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-white">Highway Speed Radar Overlay</span>
+                            <input type="checkbox" checked class="accent-emerald-500 w-4 h-4">
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2">Floating telemetry beacon showing exact highway camera zones and terminal milestones.</p>
+                    </div>
+                    <span class="text-[10px] font-mono text-emerald-400 font-bold">INSTALLED (v2.1)</span>
+                </div>
+
+                <div class="glass-card p-5 rounded-2xl space-y-3 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-white">Karaoke Lyrist Pro</span>
+                            <input type="checkbox" class="accent-emerald-500 w-4 h-4">
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2">Real-time synchronized vocal isolation and lyric scrolling for passenger pod headphone stage.</p>
+                    </div>
+                    <span class="text-[10px] font-mono text-slate-500">AVAILABLE</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 6. SETTINGS HUB (MEDIA & MUSIC PLAYER SETTINGS) ==================== -->
+        <section id="settings-page" class="page-view hidden-page space-y-5">
+            <div class="rounded-3xl glass-panel border border-cyan-500/30 p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div class="space-y-1">
+                    <span class="px-2.5 py-0.5 bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 text-[9px] font-mono font-bold uppercase rounded-full">System Configuration</span>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Player Parameters & Sensor Calibration</h2>
+                    <p class="text-slate-400 text-xs">Configure video post-processing filters, IAMF audio normalization, and auto-brightness sensor thresholds.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <!-- Video Player Settings -->
+                <div class="glass-panel p-6 rounded-3xl space-y-4">
+                    <div class="flex items-center gap-2.5 border-b border-white/10 pb-3">
+                        <i class="fas fa-video text-red-500"></i>
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider">Video Cinema Parameters</h3>
+                    </div>
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="text-slate-400 block mb-1">Color Grade Tone Mapping Filter:</label>
+                            <select onchange="applyVideoFilter(this.value)" class="w-full p-2.5 rounded-xl bg-black/60 border border-white/10 text-white font-mono">
+                                <option value="none">Default Neutral Cinema</option>
+                                <option value="contrast(115%) saturate(120%)">Vivid HDR Boost</option>
+                                <option value="sepia(15%) contrast(110%)">Warm Executive Lounge</option>
+                                <option value="hue-rotate(10deg) saturate(110%)">Cyber Matrix Cool</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                            <span class="text-slate-300 font-mono">Hardware FSR Upscaling</span>
+                            <input type="checkbox" checked class="accent-red-600 w-4 h-4">
+                        </div>
+                        <div class="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                            <span class="text-slate-300 font-mono">Auto-Skip Opening Recaps</span>
+                            <input type="checkbox" checked class="accent-red-600 w-4 h-4">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Music Player & Audio Settings -->
+                <div class="glass-panel p-6 rounded-3xl space-y-4">
+                    <div class="flex items-center gap-2.5 border-b border-white/10 pb-3">
+                        <i class="fas fa-music text-purple-400"></i>
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider">IAMF Audio Engine Parameters</h3>
+                    </div>
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="text-slate-400 block mb-1">ReplayGain Normalization:</label>
+                            <select class="w-full p-2.5 rounded-xl bg-black/60 border border-white/10 text-white font-mono">
+                                <option>EBU R128 (-23 LUFS Broadcast Standard)</option>
+                                <option>Peak Level Normalization (-1 dBFS)</option>
+                                <option>Disabled (Raw Direct Master)</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                            <span class="text-slate-300 font-mono">Virtual 5.1 Headphone Stage</span>
+                            <input type="checkbox" checked class="accent-purple-600 w-4 h-4">
+                        </div>
+                        <div class="flex items-center justify-between p-2 rounded-xl bg-white/5">
+                            <span class="text-slate-300 font-mono">Auto Ambient Lux Sensor</span>
+                            <input type="checkbox" id="auto-brightness-toggle" onchange="toggleAutoBrightness(this.checked)" checked class="accent-cyan-400 w-4 h-4">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 7. MALAYSIA SATELLITE LIVE TV PAGE ==================== -->
+        <section id="livetv-page" class="page-view hidden-page space-y-5">
+            <div class="relative overflow-hidden rounded-3xl glass-panel border border-red-500/30 p-6 md:p-8 min-h-[220px] flex items-end">
+                <div class="absolute inset-0 bg-cover bg-center opacity-35 mix-blend-luminosity scale-105" style="background-image: url('https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1200&q=80');"></div>
+                <div class="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
+                <div class="relative z-10 space-y-2 max-w-xl">
+                    <span class="px-2.5 py-0.5 bg-red-600 text-white text-[9px] font-mono font-bold uppercase rounded-full">
+                        MEASAT-3B / MYTV SATELLITE MALAYSIA
+                    </span>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">Malaysia Satellite TV Network</h2>
+                    <p class="text-slate-300 text-xs leading-relaxed">Direct broadcast satellite reception of national and regional channels across Peninsular Malaysia.</p>
+                    <button onclick="startVideoEngine('https://vjs.zencdn.net/v/oceans.mp4', 'TV3 HD - Buletin Utama Live', 'CH 103 • SATELLITE')" class="interactive-btn px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs rounded-xl flex items-center gap-2">
+                        <i class="fas fa-play text-xs"></i> Watch TV3 HD Live
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
+                <button onclick="filterTvChannels('all')" class="tv-filter-btn active px-3.5 py-1.5 rounded-xl bg-red-600 text-white font-semibold text-xs shrink-0">All Channels (10)</button>
+                <button onclick="filterTvChannels('rtm')" class="tv-filter-btn px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold shrink-0 border border-white/10">RTM Channels</button>
+                <button onclick="filterTvChannels('mediaprima')" class="tv-filter-btn px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold shrink-0 border border-white/10">Media Prima</button>
+                <button onclick="filterTvChannels('news')" class="tv-filter-btn px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold shrink-0 border border-white/10">News & Affairs</button>
+                <button onclick="filterTvChannels('sports')" class="tv-filter-btn px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold shrink-0 border border-white/10">Sports Live</button>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3" id="tv-channels-grid"></div>
+        </section>
+
+        <!-- ==================== 8. FOOD & BEVERAGES PAGE ==================== -->
+        <section id="fnb-page" class="page-view hidden-page space-y-5">
+            <div class="relative overflow-hidden rounded-3xl glass-panel border border-amber-500/30 p-6 min-h-[200px] flex items-end">
+                <div class="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-luminosity scale-105" style="background-image: url('https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&q=80');"></div>
+                <div class="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent"></div>
+                <div class="relative z-10 space-y-1 max-w-xl">
+                    <span class="px-2.5 py-0.5 bg-amber-500 text-black text-[9px] font-mono font-bold uppercase rounded-full">In-Seat Service</span>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">Seat Dining & Refreshments</h2>
+                    <p class="text-slate-300 text-xs">Freshly prepared hot meals, artisan coffee, and sweet snacks delivered straight to your pod.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
+                <button onclick="filterFnb('all')" class="fnb-filter-btn active px-3.5 py-1.5 rounded-xl bg-amber-500 text-black font-bold text-xs shrink-0">All Items</button>
+                <button onclick="filterFnb('meals')" class="fnb-filter-btn px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold shrink-0 border border-white/10">Hot Meals</button>
+                <button onclick="filterFnb('coffee')" class="fnb-filter-btn px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold shrink-0 border border-white/10">Coffee & Tea</button>
+                <button onclick="filterFnb('snacks')" class="fnb-filter-btn px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold shrink-0 border border-white/10">Snacks & Desserts</button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                <div class="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-3.5" id="fnb-menu-grid"></div>
+
+                <div class="lg:col-span-4">
+                    <div class="glass-panel p-5 rounded-2xl border border-amber-500/30 sticky top-24 space-y-3">
+                        <div class="flex justify-between items-center border-b border-white/10 pb-2.5">
+                            <div>
+                                <span class="text-[9px] font-mono text-amber-400 uppercase font-bold block">Pod Dining Tray</span>
+                                <h3 class="text-sm font-bold text-white">Your Order Summary</h3>
+                            </div>
+                            <span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-xs font-mono font-bold" id="cart-item-count">0 items</span>
+                        </div>
+
+                        <div class="space-y-2 max-h-52 overflow-y-auto hide-scrollbar" id="cart-items-container">
+                            <div class="text-center py-6 text-slate-500 text-xs font-mono">Your tray is empty.<br>Add meals from the menu.</div>
+                        </div>
+
+                        <div class="space-y-2.5 pt-2.5 border-t border-white/10">
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="text-slate-400 font-mono">Pod Location:</span>
+                                <select id="fnb-seat-select" class="p-1 rounded-md bg-black/60 border border-white/10 text-amber-400 text-xs font-mono font-bold">
+                                    <option value="Pod 04A (Active)">Pod 04A (Active)</option>
+                                    <option value="Pod 04B">Pod 04B</option>
+                                    <option value="Pod 05A">Pod 05A</option>
+                                </select>
+                            </div>
+                            <div class="flex justify-between items-center text-sm font-bold">
+                                <span class="text-slate-300 font-mono text-xs">Total:</span>
+                                <span class="text-base font-bold text-amber-400" id="cart-total-price">RM 0.00</span>
+                            </div>
+                            <button onclick="submitSeatOrder()" class="interactive-btn w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider rounded-xl shadow-md">
+                                Confirm & Pay via Gateway
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 9. CABIN COMFORT PAGE ==================== -->
+        <section id="cabin-page" class="page-view hidden-page space-y-5">
+            <div class="rounded-3xl glass-panel border border-cyan-500/30 p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div class="space-y-1">
+                    <span class="px-2.5 py-0.5 bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 text-[9px] font-mono font-bold uppercase rounded-full">Pod Comfort Suite</span>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Smart Pod Comfort & Climate</h2>
+                    <p class="text-slate-400 text-xs">Ergonomic adjustments for Pod #04A reading illumination, mood atmosphere, and seat heating.</p>
+                </div>
+                <button onclick="callCabinAttendant()" class="interactive-btn px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
+                    <i class="fas fa-bell"></i> Call Steward
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass-panel p-5 rounded-2xl space-y-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-sm"><i class="fas fa-lightbulb"></i></div>
+                        <div>
+                            <h4 class="text-xs font-bold text-white">Overhead Reading Light</h4>
+                            <span class="text-[10px] font-mono text-slate-400" id="reading-light-status">75% Brightness</span>
+                        </div>
+                    </div>
+                    <input type="range" id="reading-light-slider" min="0" max="100" value="75" oninput="updateReadingLight(this.value)" class="custom-slider custom-slider-amber w-full">
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <button onclick="setLightPreset(0)" class="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-slate-300">Off</button>
+                        <button onclick="setLightPreset(50)" class="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">50%</button>
+                        <button onclick="setLightPreset(100)" class="py-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold">100%</button>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-5 rounded-2xl space-y-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-sm"><i class="fas fa-wand-magic-sparkles"></i></div>
+                        <div>
+                            <h4 class="text-xs font-bold text-white">Ambient Mood Glow</h4>
+                            <span class="text-[10px] font-mono text-purple-300" id="mood-light-name">Cyber Purple</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-2 pt-1">
+                        <button onclick="setMoodGlow('rgba(109, 40, 217, 0.25)', 'Cyber Purple')" class="w-full h-8 rounded-lg bg-purple-600 border border-purple-400/40 hover:scale-105 transition-transform"></button>
+                        <button onclick="setMoodGlow('rgba(0, 240, 255, 0.25)', 'Neon Cyan')" class="w-full h-8 rounded-lg bg-cyan-400 border border-cyan-200/40 hover:scale-105 transition-transform"></button>
+                        <button onclick="setMoodGlow('rgba(245, 158, 11, 0.25)', 'Sunset Amber')" class="w-full h-8 rounded-lg bg-amber-500 border border-amber-300/40 hover:scale-105 transition-transform"></button>
+                        <button onclick="setMoodGlow('rgba(16, 185, 129, 0.25)', 'Emerald Lounge')" class="w-full h-8 rounded-lg bg-emerald-500 border border-emerald-300/40 hover:scale-105 transition-transform"></button>
+                    </div>
+                    <button onclick="toggleLoungeMode()" class="w-full py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-slate-300 border border-white/10">
+                        Pulse Lounge Glow
+                    </button>
+                </div>
+
+                <div class="glass-panel p-5 rounded-2xl space-y-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-sm"><i class="fas fa-temperature-half"></i></div>
+                        <div>
+                            <h4 class="text-xs font-bold text-white">Seat Thermal Conditioning</h4>
+                            <span class="text-[10px] font-mono text-cyan-400">Target Temp: 22°C</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10 text-xs">
+                        <span class="text-slate-300 font-mono">Heat Level:</span>
+                        <div class="flex gap-1">
+                            <button onclick="setSeatHeat(0)" id="heat-0" class="px-2 py-0.5 rounded bg-white/10 text-xs font-mono">0</button>
+                            <button onclick="setSeatHeat(1)" id="heat-1" class="px-2 py-0.5 rounded bg-white/10 text-xs font-mono">1</button>
+                            <button onclick="setSeatHeat(2)" id="heat-2" class="px-2 py-0.5 rounded bg-red-600 text-white text-xs font-mono font-bold">2</button>
+                            <button onclick="setSeatHeat(3)" id="heat-3" class="px-2 py-0.5 rounded bg-white/10 text-xs font-mono">3</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 10. WI-FI PORTAL ==================== -->
+        <section id="wifi-page" class="page-view hidden-page space-y-5">
+            <div class="rounded-3xl glass-panel border border-blue-500/30 p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div class="space-y-1">
+                    <span class="px-2.5 py-0.5 bg-blue-500/20 border border-blue-500/40 text-blue-400 text-[9px] font-mono font-bold uppercase rounded-full">Starlink Mobile Ku-Band</span>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Onboard Wi-Fi & 5G Portal</h2>
+                    <p class="text-slate-400 text-xs">High-speed satellite connectivity for smartphones, laptops, and tablets.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span class="text-xs font-mono text-emerald-400 font-bold uppercase">Online • 380 Mbps Link</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                <div class="lg:col-span-7 glass-panel p-6 rounded-2xl space-y-4 flex flex-col justify-between">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-sm font-bold text-white">Live Speed Benchmark</h3>
+                            <span class="text-[11px] font-mono text-slate-400">Target: Starlink Cyberjaya Gateway</span>
+                        </div>
+                        <button onclick="runSpeedtest()" id="speedtest-run-btn" class="interactive-btn px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold rounded-lg uppercase">
+                            Test Speed
+                        </button>
+                    </div>
+
+                    <div class="flex flex-col items-center justify-center py-4">
+                        <div class="text-5xl font-black text-white font-mono tracking-tight" id="speed-meter-num">384.2</div>
+                        <span class="text-[10px] font-mono text-cyan-400 uppercase tracking-widest mt-0.5">Megabits Per Second (Mbps)</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2.5 text-center font-mono text-xs pt-3 border-t border-white/10">
+                        <div class="p-2.5 rounded-xl bg-white/5">
+                            <span class="text-slate-400 block text-[9px]">PING</span>
+                            <span class="text-emerald-400 font-bold" id="speed-ping">14 ms</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-white/5">
+                            <span class="text-slate-400 block text-[9px]">UPLOAD</span>
+                            <span class="text-sky-400 font-bold">42.8 Mbps</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-white/5">
+                            <span class="text-slate-400 block text-[9px]">JITTER</span>
+                            <span class="text-purple-400 font-bold">1.8 ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-5 glass-panel p-6 rounded-2xl space-y-3 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Device Wi-Fi Pass</h3>
+                        <p class="text-xs text-slate-400 mt-1">Scan QR to authenticate onto the passenger network instantly.</p>
+                        <div class="my-4 p-4 rounded-xl bg-white text-black flex flex-col items-center justify-center max-w-[160px] mx-auto shadow-lg">
+                            <i class="fas fa-qrcode text-6xl"></i>
+                            <span class="text-[9px] font-mono font-bold mt-1.5">ANIX_PLATINUM_5G</span>
+                        </div>
+                    </div>
+                    <div class="space-y-1 text-xs font-mono text-slate-400">
+                        <div class="flex justify-between"><span>Security:</span> <strong class="text-white">WPA3</strong></div>
+                        <div class="flex justify-between"><span>Allocation:</span> <strong class="text-emerald-400">Unlimited</strong></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 11. CINEMA HUB ==================== -->
+        <section id="cinema-page" class="page-view hidden-page space-y-5">
+            <div class="relative overflow-hidden rounded-3xl glass-panel border border-white/10 p-6 min-h-[220px] flex items-end">
+                <div class="absolute inset-0 bg-cover bg-center opacity-35 mix-blend-luminosity scale-105" style="background-image: url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1200&q=80');"></div>
+                <div class="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
+                <div class="relative z-10 space-y-2 max-w-xl">
+                    <span class="px-2.5 py-0.5 bg-red-600 text-white text-[9px] font-mono font-bold uppercase rounded-full">Cinema Premiere</span>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">Oceans of Orion</h2>
+                    <p class="text-slate-300 text-xs">Uncharted deep sea exploration with synchronized Dolby bus surround sound.</p>
+                    <button onclick="startVideoEngine('https://vjs.zencdn.net/v/oceans.mp4', 'Oceans of Orion', 'Nature / Sci-Fi')" class="interactive-btn px-4 py-2 bg-white text-black font-bold text-xs rounded-xl flex items-center gap-2 hover:bg-red-600 hover:text-white transition-colors">
+                        <i class="fas fa-play text-xs"></i> Stream in 4K
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+                <div class="glass-card rounded-2xl overflow-hidden cursor-pointer group" onclick="startVideoEngine('https://vjs.zencdn.net/v/oceans.mp4', 'Interstellar Drift', 'Sci-Fi Space')">
+                    <div class="h-32 bg-slate-800 relative overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500&q=80" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                    </div>
+                    <div class="p-3">
+                        <span class="text-[9px] font-mono text-red-400 font-bold uppercase">4K HDR</span>
+                        <h4 class="text-xs font-bold text-white truncate">Interstellar Drift</h4>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl overflow-hidden cursor-pointer group" onclick="startVideoEngine('https://vjs.zencdn.net/v/oceans.mp4', 'Apex Speedline: Tokyo', 'Motorsport')">
+                    <div class="h-32 bg-slate-800 relative overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=500&q=80" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                    </div>
+                    <div class="p-3">
+                        <span class="text-[9px] font-mono text-emerald-400 font-bold uppercase">IAMF 3D</span>
+                        <h4 class="text-xs font-bold text-white truncate">Apex Speedline: Tokyo</h4>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl overflow-hidden cursor-pointer group" onclick="startVideoEngine('https://vjs.zencdn.net/v/oceans.mp4', 'Neon Nights Circuit', 'Cyberpunk')">
+                    <div class="h-32 bg-slate-800 relative overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1578681994506-b8f463449011?w=500&q=80" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                    </div>
+                    <div class="p-3">
+                        <span class="text-[9px] font-mono text-purple-400 font-bold uppercase">Dolby Atmos</span>
+                        <h4 class="text-xs font-bold text-white truncate">Neon Nights Circuit</h4>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl overflow-hidden cursor-pointer group" onclick="startVideoEngine('https://vjs.zencdn.net/v/oceans.mp4', 'Deep Marianas Acoustic', 'Documentary')">
+                    <div class="h-32 bg-slate-800 relative overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=500&q=80" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                    </div>
+                    <div class="p-3">
+                        <span class="text-[9px] font-mono text-sky-400 font-bold uppercase">Spatial Sound</span>
+                        <h4 class="text-xs font-bold text-white truncate">Deep Marianas Acoustic</h4>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 12. MUSIC STAGE ==================== -->
+        <section id="music-page" class="page-view hidden-page space-y-5">
+            <div class="relative overflow-hidden rounded-3xl glass-panel border border-purple-500/20 p-6 min-h-[200px] flex items-end">
+                <div class="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-screen scale-105" style="background-image: url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&q=80');"></div>
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0B0813] via-[#0B0813]/70 to-transparent"></div>
+                <div class="relative z-10 space-y-2 max-w-xl">
+                    <span class="px-2.5 py-0.5 bg-purple-600 text-white text-[9px] font-mono font-bold uppercase rounded-full">Eclipsa Hi-Res Stage</span>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">Synthetica Spatial Audio</h2>
+                    <p class="text-slate-300 text-xs">Lossless Master bus routing with multi-channel binaural soundstage for individual passenger pods.</p>
+                    <button onclick="playMusicTrack(0)" class="interactive-btn px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center gap-2">
+                        <i class="fas fa-play text-xs"></i> Play Album
+                    </button>
+                </div>
+            </div>
+
+            <div class="glass-panel p-5 rounded-2xl space-y-2">
+                <h3 class="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold mb-2">Master Audio Catalog</h3>
+                <div class="divide-y divide-white/5" id="music-track-list"></div>
+            </div>
+        </section>
+
+        <!-- ==================== 13. CREW PORTAL ==================== -->
+        <section id="crew-portal-page" class="page-view hidden-page space-y-5">
+            <div class="rounded-3xl glass-panel border border-amber-500/30 p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div class="space-y-1">
+                    <span class="px-2.5 py-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[9px] font-mono font-bold uppercase rounded-full">Crew Attendant Portal</span>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Coach Captain & Cabin Galley</h2>
+                    <p class="text-slate-400 text-xs">Manage passenger chimes, review in-seat food orders, and dispatch intercom broadcasts.</p>
+                </div>
+                <button onclick="broadcastCrewIntercom()" class="interactive-btn px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                    <i class="fas fa-bullhorn"></i> Intercom Broadcast
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                <div class="lg:col-span-7 space-y-5">
+                    <div class="glass-panel p-5 rounded-2xl border border-red-500/20 space-y-3">
+                        <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                                <h3 class="text-xs font-bold text-white uppercase tracking-wider">Passenger Attendant Calls</h3>
+                            </div>
+                            <span class="text-xs font-mono text-red-400 font-semibold" id="crew-call-count">1 Active Chime</span>
+                        </div>
+                        <div class="space-y-2" id="crew-calls-list"></div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-5">
+                    <div class="glass-panel p-5 rounded-2xl border border-amber-500/20 space-y-3">
+                        <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Galley Order Queue</h3>
+                            <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[11px] font-mono font-bold" id="crew-order-count">2 Pending</span>
+                        </div>
+                        <div class="space-y-2.5 max-h-[380px] overflow-y-auto hide-scrollbar" id="crew-orders-queue"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 14. ADMIN PAGE (PROTECTED BY PIN LOCK) ==================== -->
+        <section id="admin-page" class="page-view hidden-page space-y-5">
+            <div class="rounded-3xl glass-panel border border-purple-500/30 p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                <div>
+                    <span class="px-2.5 py-0.5 bg-purple-500/20 text-purple-300 text-[9px] font-mono font-bold uppercase rounded-full">Root Node (Authenticated)</span>
+                    <h2 class="text-xl font-bold text-white tracking-tight mt-1">System Administration & Ingest DB</h2>
+                </div>
+                <button onclick="lockAdminSession()" class="interactive-btn px-3 py-1.5 bg-red-600/30 hover:bg-red-600 text-white rounded-lg text-xs font-mono font-bold">
+                    <i class="fas fa-lock mr-1"></i> Lock Session
+                </button>
+            </div>
+
+            <!-- Ingest Table -->
+            <div class="glass-panel p-5 rounded-2xl border border-cyan-500/20 space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">Indexed Local Media Vault</h3>
+                    <div class="flex gap-2">
+                        <label class="interactive-btn px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-mono font-medium cursor-pointer">
+                            <i class="fas fa-folder-open mr-1"></i> Ingest Folder
+                            <input type="file" webkitdirectory directory multiple class="hidden" onchange="handleFolderIngest(event)">
+                        </label>
+                        <button onclick="registerIngestMediaPrompt()" class="interactive-btn px-3 py-1.5 bg-white/10 text-white rounded-lg text-xs font-mono">
+                            <i class="fas fa-plus mr-1"></i> Manual Path
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-white/10 bg-black/40">
+                    <table class="w-full text-left border-collapse text-xs font-mono">
+                        <thead>
+                            <tr class="border-b border-white/10 bg-white/5 text-slate-400 uppercase">
+                                <th class="p-3">File Name</th>
+                                <th class="p-3">Format</th>
+                                <th class="p-3">Size</th>
+                                <th class="p-3">Path</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ingest-db-body" class="divide-y divide-white/5 text-slate-300"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 15. WALLPAPER THEMES ==================== -->
+        <section id="wallpaper-page" class="page-view hidden-page space-y-5">
+            <div class="rounded-3xl glass-panel border border-fuchsia-500/30 p-5 flex justify-between items-center">
+                <div>
+                    <span class="px-2.5 py-0.5 bg-fuchsia-500/20 text-fuchsia-300 text-[9px] font-mono font-bold uppercase rounded-full">Display Themes</span>
+                    <h2 class="text-xl font-bold text-white tracking-tight mt-1">Atmospheric Wallpaper Themes</h2>
+                </div>
+                <button onclick="resetDefaultWallpaper()" class="interactive-btn px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-mono">
+                    Reset Default
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+                <div onclick="applyWallpaper('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop', 'Cyber Neon Horizon')" class="glass-card rounded-xl overflow-hidden cursor-pointer group p-2.5 space-y-2">
+                    <div class="h-32 rounded-lg overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=600&auto=format&fit=crop" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                    </div>
+                    <h4 class="text-xs font-bold text-white">Cyber Neon Horizon</h4>
+                </div>
+
+                <div onclick="applyWallpaper('https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1920&q=80', 'Deep Space Nebula')" class="glass-card rounded-xl overflow-hidden cursor-pointer group p-2.5 space-y-2">
+                    <div class="h-32 rounded-lg overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&q=80" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                    </div>
+                    <h4 class="text-xs font-bold text-white">Deep Space Nebula</h4>
+                </div>
+
+                <div onclick="applyWallpaper('https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1920&q=80', 'Synthwave Wireframe')" class="glass-card rounded-xl overflow-hidden cursor-pointer group p-2.5 space-y-2">
+                    <div class="h-32 rounded-lg overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&q=80" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                    </div>
+                    <h4 class="text-xs font-bold text-white">Synthwave Wireframe</h4>
+                </div>
+
+                <div onclick="applyWallpaper('https://images.unsplash.com/photo-1518770660439-4636190af475?w=1920&q=80', 'Executive Minimal Carbon')" class="glass-card rounded-xl overflow-hidden cursor-pointer group p-2.5 space-y-2">
+                    <div class="h-32 rounded-lg overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&q=80" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                    </div>
+                    <h4 class="text-xs font-bold text-white">Executive Minimal Carbon</h4>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==================== RESPONSIVE BOTTOM DOCK ==================== -->
+    <div class="bottom-nav hide-scrollbar">
+        <div class="nav-item active" data-target="main-dashboard" onclick="showPage('main-dashboard')"><i class="fas fa-house text-base"></i><span class="text-[9px] uppercase tracking-wider">Home</span></div>
+        <div class="nav-item" data-target="livetv-page" onclick="showPage('livetv-page')"><i class="fas fa-tv text-base"></i><span class="text-[9px] uppercase tracking-wider">Live TV</span></div>
+        <div class="nav-item" data-target="cinema-page" onclick="showPage('cinema-page')"><i class="fas fa-film text-base"></i><span class="text-[9px] uppercase tracking-wider">Cinema</span></div>
+        <div class="nav-item" data-target="fnb-page" onclick="showPage('fnb-page')"><i class="fas fa-utensils text-base"></i><span class="text-[9px] uppercase tracking-wider">Dining</span></div>
+        <div class="nav-item" data-target="cabin-page" onclick="showPage('cabin-page')"><i class="fas fa-couch text-base"></i><span class="text-[9px] uppercase tracking-wider">Cabin</span></div>
+        <div class="nav-item" data-target="wifi-page" onclick="showPage('wifi-page')"><i class="fas fa-wifi text-base"></i><span class="text-[9px] uppercase tracking-wider">Wi-Fi</span></div>
+        <div class="nav-item" data-target="music-page" onclick="showPage('music-page')"><i class="fas fa-music text-base"></i><span class="text-[9px] uppercase tracking-wider">Music</span></div>
+        <div class="nav-item" data-target="membership-page" onclick="showPage('membership-page')"><i class="fas fa-crown text-base text-purple-400"></i><span class="text-[9px] uppercase tracking-wider">Profile</span></div>
+        <div class="nav-item" data-target="sysinfo-page" onclick="showPage('sysinfo-page')"><i class="fas fa-server text-base text-cyan-400"></i><span class="text-[9px] uppercase tracking-wider">Specs</span></div>
+    </div>
+
+    <!-- ==================== CORE JAVASCRIPT ==================== -->
+    <script>
+        // ----------------------------------------------------
+        // 1. PAGE NAVIGATION SYSTEM
+        // ----------------------------------------------------
+        function showPage(pageId) {
+            document.querySelectorAll('.page-view').forEach(p => p.classList.add('hidden-page'));
+            const target = document.getElementById(pageId);
+            if(target) target.classList.remove('hidden-page');
+            
+            document.querySelectorAll('.nav-item').forEach(nav => {
+                nav.classList.remove('active');
+                if(nav.getAttribute('data-target') === pageId) nav.classList.add('active');
+            });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // ----------------------------------------------------
+        // 2. ADMIN PIN LOCK SYSTEM
+        // ----------------------------------------------------
+        let isAdminUnlocked = false;
+        function checkAdminAccess() {
+            if (isAdminUnlocked) {
+                showPage('admin-page');
+                return;
+            }
+            Swal.fire({
+                title: 'ADMIN SECURITY PIN',
+                text: 'Enter Master Terminal Passcode (Default: 2026 or 7788)',
+                input: 'password',
+                inputAttributes: {
+                    maxlength: 6,
+                    autocapitalize: 'off',
+                    autocorrect: 'off',
+                    style: 'text-align:center; font-size: 24px; letter-spacing: 6px; font-family: monospace;'
+                },
+                showCancelButton: true,
+                confirmButtonColor: '#6D28D9',
+                cancelButtonColor: '#334155',
+                confirmButtonText: 'Authorize Node',
+                background: '#110F17',
+                color: '#fff'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    if (result.value === '2026' || result.value === '7788') {
+                        isAdminUnlocked = true;
+                        showPage('admin-page');
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'AUTHENTICATED',
+                            text: 'Root terminal granted for Pod #04A session.',
+                            timer: 1200,
+                            showConfirmButton: false,
+                            background: '#110F17',
+                            color: '#fff'
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'ACCESS DENIED',
+                            text: 'Invalid Passcode entered.',
+                            background: '#110F17',
+                            color: '#fff'
+                        });
+                    }
+                }
+            });
+        }
+
+        function lockAdminSession() {
+            isAdminUnlocked = false;
+            showPage('main-dashboard');
+            Swal.fire({ title: 'LOCKED', text: 'Admin terminal secured.', icon: 'info', timer: 1000, showConfirmButton: false, background: '#110F17', color: '#fff' });
+        }
+
+        // ----------------------------------------------------
+        // 3. AUTO-BRIGHTNESS & SENSOR DETECTION
+        // ----------------------------------------------------
+        let autoBrightnessActive = true;
+        function initAutoBrightnessSensor() {
+            if ('AmbientLightSensor' in window) {
+                try {
+                    const sensor = new AmbientLightSensor();
+                    sensor.addEventListener('reading', () => {
+                        if (!autoBrightnessActive) return;
+                        setBrightnessLevel(sensor.illuminance);
+                    });
+                    sensor.start();
+                } catch (e) {
+                    timeOfDayLuxFallback();
+                }
+            } else {
+                timeOfDayLuxFallback();
+            }
+        }
+
+        function timeOfDayLuxFallback() {
+            const hr = new Date().getHours();
+            let lux = 450;
+            if (hr >= 19 || hr < 7) { lux = 40; } // Cabin dimmed at night
+            setBrightnessLevel(lux);
+        }
+
+        function setBrightnessLevel(lux) {
+            if (!autoBrightnessActive) return;
+            const targetBrightness = Math.min(1.0, Math.max(0.45, 0.45 + (lux / 500) * 0.45));
+            document.documentElement.style.setProperty('--wallpaper-brightness', targetBrightness.toFixed(2));
+            const sensorEl = document.getElementById('lux-sensor-val');
+            if (sensorEl) {
+                sensorEl.innerText = `${Math.round(lux)} Lux (${Math.round(targetBrightness * 100)}%)`;
+            }
+        }
+
+        function toggleAutoBrightness(enabled) {
+            autoBrightnessActive = enabled;
+            if (!enabled) {
+                document.documentElement.style.setProperty('--wallpaper-brightness', '0.75');
+                const sensorEl = document.getElementById('lux-sensor-val');
+                if (sensorEl) sensorEl.innerText = 'Manual (75%)';
+            } else {
+                timeOfDayLuxFallback();
+            }
+        }
+        setTimeout(initAutoBrightnessSensor, 600);
+
+        // ----------------------------------------------------
+        // 4. HOMEPAGE TRAILER PREVIEW MODAL
+        // ----------------------------------------------------
+        function openTrailerModal(videoUrl, title) {
+            const modal = document.getElementById('trailer-modal');
+            const video = document.getElementById('trailer-video-element');
+            document.getElementById('trailer-title').innerText = title;
+            video.src = videoUrl;
+            modal.classList.remove('hidden-page');
+            video.play().catch(() => {});
+        }
+
+        function closeTrailerModal() {
+            const modal = document.getElementById('trailer-modal');
+            const video = document.getElementById('trailer-video-element');
+            video.pause();
+            modal.classList.add('hidden-page');
+        }
+
+        // ----------------------------------------------------
+        // 5. WEATHER MODAL CONTROLS
+        // ----------------------------------------------------
+        function openWeatherModal() { document.getElementById('weather-modal').classList.remove('hidden-page'); }
+        function closeWeatherModal() { document.getElementById('weather-modal').classList.add('hidden-page'); }
+        function refreshGeoWeather() {
+            Swal.fire({ title: 'TELEMETRY SYNCED', text: 'Expressway weather radar updated.', icon: 'success', timer: 1000, background: '#110F17', color: '#fff', showConfirmButton: false });
+        }
+
+        // ----------------------------------------------------
+        // 6. LOCAL PAYMENT GATEWAY & DIGITAL RECEIPTS
+        // ----------------------------------------------------
+        let currentPayMethod = "DuitNow QR";
+        let currentPayAmount = 24.00;
+
+        function setPaymentMethod(methodName) {
+            currentPayMethod = methodName;
+            document.getElementById('selected-gateway-label').innerText = methodName;
+            document.querySelectorAll('.pay-method-btn').forEach(btn => {
+                btn.className = "pay-method-btn p-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 text-xs font-mono font-bold flex flex-col items-center gap-1.5";
+            });
+            event.currentTarget.className = "pay-method-btn active p-3 rounded-xl bg-emerald-600/30 border border-emerald-500/50 text-white text-xs font-mono font-bold flex flex-col items-center gap-1.5";
+        }
+
+        function executePaymentTransaction() {
+            Swal.fire({
+                title: 'PROCESSING PAYMENT',
+                html: `<div class="font-mono text-xs text-slate-300">Connecting to ${currentPayMethod}...<br>Authenticating local bus gateway...</div>`,
+                timer: 1400,
+                showConfirmButton: false,
+                background: '#110F17',
+                color: '#fff'
+            }).then(() => {
+                const invNumber = 'INV-' + Math.floor(100000 + Math.random() * 900000);
+                const now = new Date();
+                const timeString = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                
+                document.getElementById('rcpt-no').innerText = invNumber;
+                document.getElementById('rcpt-time').innerText = timeString;
+                document.getElementById('rcpt-method').innerText = currentPayMethod;
+                document.getElementById('rcpt-total').innerText = 'RM ' + currentPayAmount.toFixed(2);
+
+                Swal.fire({
+                    title: 'PAYMENT SUCCESSFUL',
+                    text: `Transaction authorized. Invoice #${invNumber} generated.`,
+                    icon: 'success',
+                    background: '#110F17',
+                    color: '#fff',
+                    confirmButtonColor: '#10B981'
+                });
+            });
+        }
+
+        // ----------------------------------------------------
+        // 7. MEMBERSHIP PREFERENCES MEMORY
+        // ----------------------------------------------------
+        function saveProfilePreferences() {
+            const alias = document.getElementById('profile-name-input').value;
+            document.getElementById('nav-user-alias').innerText = `${alias} • PLATINUM`;
+            Swal.fire({
+                title: 'PREFERENCES SAVED',
+                text: 'Your pod memory parameters have been committed to Pod #04A.',
+                icon: 'success',
+                timer: 1200,
+                background: '#110F17',
+                color: '#fff',
+                showConfirmButton: false
+            });
+        }
+
+        // ----------------------------------------------------
+        // 8. PLAYER SETTINGS (VIDEO FILTERS)
+        // ----------------------------------------------------
+        function applyVideoFilter(filterVal) {
+            document.documentElement.style.setProperty('--video-filter', filterVal);
+            Swal.fire({
+                title: 'TONE MAPPING APPLIED',
+                text: 'Cinema color grade profile updated.',
+                icon: 'success',
+                timer: 1000,
+                background: '#110F17',
+                color: '#fff',
+                showConfirmButton: false
+            });
+        }
+
+        // ----------------------------------------------------
+        // 9. YOUTUBE APP EMBED
+        // ----------------------------------------------------
+        function openYouTubeApp() { document.getElementById('youtube-app-modal').classList.remove('hidden-page'); }
+        function closeYouTubeApp() {
+            document.getElementById('youtube-app-modal').classList.add('hidden-page');
+            const frame = document.getElementById('yt-player-frame');
+            frame.src = frame.src;
+        }
+
+        function changeYouTubeVideo(videoId, title) {
+            const frame = document.getElementById('yt-player-frame');
+            frame.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+            Swal.fire({ title: 'STREAM READY', text: title, icon: 'info', timer: 1000, background: '#110F17', color: '#fff', showConfirmButton: false });
+        }
+
+        function loadCustomYouTubeVideo() {
+            let input = document.getElementById('yt-custom-query').value.trim();
+            if(!input) return;
+            let videoId = input;
+            if(input.includes('v=')) { videoId = input.split('v=')[1].split('&')[0]; }
+            else if(input.includes('youtu.be/')) { videoId = input.split('youtu.be/')[1].split('?')[0]; }
+            changeYouTubeVideo(videoId, `Video (${videoId})`);
+        }
+
+        // ----------------------------------------------------
+        // 10. HERO AD SLIDESHOW
+        // ----------------------------------------------------
+        let currentAdIndex = 0;
+        const adSlides = document.querySelectorAll('.ad-slide');
+        const adDots = document.querySelectorAll('.ad-dot');
+
+        function showAdSlide(index) {
+            if(adSlides.length === 0) return;
+            adSlides.forEach(s => s.classList.remove('active'));
+            adDots.forEach(d => { d.className = "ad-dot w-1.5 h-1 rounded-full bg-white/20 transition-all"; });
+            currentAdIndex = (index + adSlides.length) % adSlides.length;
+            adSlides[currentAdIndex].classList.add('active');
+            adDots[currentAdIndex].className = "ad-dot w-5 h-1 rounded-full bg-cyan-400 transition-all";
+        }
+
+        function nextAdSlide() { showAdSlide(currentAdIndex + 1); }
+        function prevAdSlide() { showAdSlide(currentAdIndex - 1); }
+        setInterval(nextAdSlide, 5500);
+
+        // ----------------------------------------------------
+        // 11. VIDEO PLAYER SUBSYSTEM
+        // ----------------------------------------------------
+        let videoPlayerInstance = null;
+        let ccEnabled = false;
+        let currentCCIndex = 0;
+        let ccInterval = null;
+
+        const dummySubtitles = [
+            "Initializing Node Audio Bus...",
+            "Resonance spatial frequency tuned.",
+            "Approaching Next Expressway Interchange.",
+            "Cabin acoustics dynamically optimized.",
+            "Enjoy the Platinum Hybrid Node Experience."
+        ];
+
+        function initVideoEngine() {
+            if(!videoPlayerInstance) {
+                videoPlayerInstance = videojs('anix-video-element', {
+                    controls: false, autoplay: false, preload: 'auto', fluid: false
+                });
+
+                videoPlayerInstance.on('timeupdate', () => {
+                    const cur = videoPlayerInstance.currentTime();
+                    const dur = videoPlayerInstance.duration() || 1;
+                    document.getElementById('vp-cur-time').innerText = formatTime(cur);
+                    document.getElementById('vp-dur-time').innerText = formatTime(dur);
+                    document.getElementById('vp-seek-bar').value = (cur / dur) * 100;
+                });
+
+                videoPlayerInstance.on('play', () => { document.getElementById('vp-play-btn').innerHTML = '<i class="fas fa-pause text-xs"></i>'; });
+                videoPlayerInstance.on('pause', () => { document.getElementById('vp-play-btn').innerHTML = '<i class="fas fa-play text-xs ml-0.5"></i>'; });
+            }
+        }
+
+        function startVideoEngine(url, title, badge) {
+            initVideoEngine();
+            document.getElementById('vp-title').innerText = title;
+            document.getElementById('vp-badge').innerText = badge;
+            document.getElementById('video-container-root').classList.remove('hidden-page');
+            document.getElementById('video-mini-pip').classList.add('hidden');
+            
+            videoPlayerInstance.src({ type: 'video/mp4', src: url });
+            videoPlayerInstance.play().catch(() => {});
+        }
+
+        function toggleVideoPlay() {
+            if(!videoPlayerInstance) return;
+            if(videoPlayerInstance.paused()) { videoPlayerInstance.play(); } else { videoPlayerInstance.pause(); }
+        }
+
+        function onVideoSeek(percent) {
+            if(!videoPlayerInstance) return;
+            const dur = videoPlayerInstance.duration();
+            if(dur) videoPlayerInstance.currentTime((percent / 100) * dur);
+        }
+
+        function seekVideoRelative(seconds) {
+            if(!videoPlayerInstance) return;
+            videoPlayerInstance.currentTime(videoPlayerInstance.currentTime() + seconds);
+        }
+
+        function toggleVideoSubtitles() {
+            ccEnabled = !ccEnabled;
+            const ccBox = document.getElementById('vp-subtitles-text');
+            const ccStatus = document.getElementById('vp-cc-status');
+            if(ccEnabled) {
+                ccStatus.innerText = 'ON';
+                ccStatus.classList.add('text-yellow-400');
+                ccBox.classList.remove('hidden');
+                ccBox.innerText = dummySubtitles[0];
+                ccInterval = setInterval(() => {
+                    currentCCIndex = (currentCCIndex + 1) % dummySubtitles.length;
+                    ccBox.innerText = dummySubtitles[currentCCIndex];
+                }, 4000);
+            } else {
+                ccStatus.innerText = 'OFF';
+                ccStatus.classList.remove('text-yellow-400');
+                ccBox.classList.add('hidden');
+                clearInterval(ccInterval);
+            }
+        }
+
+        function toggleVideoSettingsModal() { document.getElementById('vp-settings-modal').classList.toggle('hidden'); }
+        function setVideoSpeed(speed) { if(videoPlayerInstance) videoPlayerInstance.playbackRate(speed); toggleVideoSettingsModal(); }
+        function setVideoQuality(quality) { toggleVideoSettingsModal(); }
+        function toggleVideoFullscreen() {
+            if(!document.fullscreenElement) { document.getElementById('video-container-root').requestFullscreen().catch(() => {}); }
+            else { document.exitFullscreen().catch(() => {}); }
+        }
+        function toggleVideoMiniPlayer() {
+            document.getElementById('video-container-root').classList.add('hidden-page');
+            document.getElementById('video-mini-pip').classList.remove('hidden');
+            const vElem = document.getElementById('anix-video-element');
+            document.getElementById('video-pip-mount').appendChild(vElem);
+        }
+        function expandVideoMiniPlayer() {
+            document.getElementById('video-mini-pip').classList.add('hidden');
+            document.getElementById('video-container-root').classList.remove('hidden-page');
+            const vElem = document.getElementById('anix-video-element');
+            document.getElementById('video-wrapper').appendChild(vElem);
+        }
+        function toggleVideoPiP() { toggleVideoMiniPlayer(); }
+        function closeVideoPlayer() {
+            if(videoPlayerInstance) videoPlayerInstance.pause();
+            document.getElementById('video-container-root').classList.add('hidden-page');
+            document.getElementById('video-mini-pip').classList.add('hidden');
+            const vElem = document.getElementById('anix-video-element');
+            document.getElementById('video-wrapper').appendChild(vElem);
+        }
+
+        // ----------------------------------------------------
+        // 12. LOCAL MEDIA INGEST (ADMIN VAULT)
+        // ----------------------------------------------------
+        let localIngestDB = [
+            { id: 1, name: "oceans_4k_hdr.mp4", folder: "/Movies/SciFi", type: "Video (MP4)", size: "4.2 GB", path: "Local Drive", blobUrl: "https://vjs.zencdn.net/v/oceans.mp4", status: "Indexed" },
+            { id: 2, name: "eclipsa_album_flac.flac", folder: "/Music/HiRes", type: "Audio (FLAC)", size: "840 MB", path: "Local Drive", blobUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", status: "Indexed" }
+        ];
+
+        function handleFolderIngest(event) {
+            const files = event.target.files;
+            if(!files || files.length === 0) return;
+            let ingestedCount = 0;
+            let rootFolderName = "";
+
+            for (let i = 0; i < files.length; i++) {
+                const f = files[i];
+                const isVideo = f.type.startsWith('video') || f.name.match(/\.(mp4|mkv|webm|mov|avi)$/i);
+                const isAudio = f.type.startsWith('audio') || f.name.match(/\.(mp3|flac|wav|aac|ogg)$/i);
+
+                if(isVideo || isAudio) {
+                    const relativePath = f.webkitRelativePath || f.name;
+                    const pathParts = relativePath.split('/');
+                    if(!rootFolderName && pathParts.length > 1) { rootFolderName = pathParts[0]; }
+                    const folderPath = pathParts.length > 1 ? '/' + pathParts.slice(0, -1).join('/') : '/Root';
+                    const objectUrl = URL.createObjectURL(f);
+                    const sizeMB = (f.size / (1024 * 1024)).toFixed(1) + ' MB';
+
+                    localIngestDB.unshift({
+                        id: Date.now() + i,
+                        name: f.name,
+                        folder: folderPath,
+                        type: isVideo ? "Video (Local)" : "Audio (Local)",
+                        size: sizeMB,
+                        path: relativePath,
+                        blobUrl: objectUrl,
+                        status: "Mounted"
+                    });
+                    ingestedCount++;
+                }
+            }
+            renderIngestDBTable();
+            Swal.fire({ title: 'FOLDER INGESTED', text: `${ingestedCount} media files mounted to vault.`, icon: 'success', background: '#110F17', color: '#fff', confirmButtonColor: '#00F0FF' });
+        }
+
+        function renderIngestDBTable() {
+            const tbody = document.getElementById('ingest-db-body');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+            localIngestDB.forEach((item) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-white/5 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-white flex items-center gap-2">
+                        <i class="fas ${item.type.includes('Video') ? 'fa-film text-red-500' : 'fa-music text-purple-400'}"></i>
+                        <span class="truncate max-w-[130px] md:max-w-xs">${item.name}</span>
+                    </td>
+                    <td class="p-3 text-slate-300">${item.type}</td>
+                    <td class="p-3 text-slate-400">${item.size}</td>
+                    <td class="p-3 text-cyan-400 truncate max-w-[110px] md:max-w-xs">${item.folder}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-500/30">${item.status}</span></td>
+                    <td class="p-3 text-right space-x-2">
+                        <button onclick="playIngestedMedia(${item.id})" class="text-cyan-400 hover:text-white"><i class="fas fa-play"></i></button>
+                        <button onclick="deleteIngestRecord(${item.id})" class="text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        renderIngestDBTable();
+
+        function playIngestedMedia(id) {
+            const found = localIngestDB.find(i => i.id === id);
+            if(!found) return;
+            const targetUrl = found.blobUrl || 'https://vjs.zencdn.net/v/oceans.mp4';
+            if(found.type.includes('Video')) {
+                startVideoEngine(targetUrl, found.name, 'LOCAL DB MOUNT');
+            } else {
+                audioElement.src = targetUrl;
+                audioElement.play();
+                document.getElementById('music-mini-title').innerText = found.name;
+                document.getElementById('music-mini-artist').innerText = found.folder;
+                document.getElementById('music-mini-bar').classList.remove('hidden');
+                setSpinning(true);
+            }
+        }
+
+        function deleteIngestRecord(id) {
+            localIngestDB = localIngestDB.filter(i => i.id !== id);
+            renderIngestDBTable();
+        }
+
+        function registerIngestMediaPrompt() {
+            Swal.fire({
+                title: 'REGISTER PATH',
+                html: `<div class="space-y-2 text-left text-xs font-mono"><input id="swal-ingest-name" type="text" placeholder="Alias Name" class="w-full p-2 rounded bg-black border border-white/15 text-white"><input id="swal-ingest-path" type="text" placeholder="Local Storage Path" class="w-full p-2 rounded bg-black border border-white/15 text-white"></div>`,
+                background: '#110F17', color: '#fff', showCancelButton: true, confirmButtonColor: '#00F0FF', confirmButtonText: 'Add'
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    const name = document.getElementById('swal-ingest-name').value;
+                    const path = document.getElementById('swal-ingest-path').value;
+                    if(name && path) {
+                        localIngestDB.push({ id: Date.now(), name: name, folder: "/Manual", type: "Video (Local)", size: "1.2 GB", path: path, blobUrl: "https://vjs.zencdn.net/v/oceans.mp4", status: "Indexed" });
+                        renderIngestDBTable();
+                    }
+                }
+            });
+        }
+
+        // ----------------------------------------------------
+        // 13. CREW PORTAL
+        // ----------------------------------------------------
+        let crewCalls = [{ id: 1, pod: "Pod 04A (Active)", time: "Just now", reason: "Passenger Chime" }];
+        let crewOrders = [
+            { id: 201, pod: "Pod 04A (Active)", item: "Nasi Lemak Sambal Sotong", price: 14.50, status: "Preparing" },
+            { id: 202, pod: "Pod 02B", item: "Cold Brew Arabica", price: 9.50, status: "Pending" }
+        ];
+
+        function renderCrewPortal() {
+            const callsList = document.getElementById('crew-calls-list');
+            const callCount = document.getElementById('crew-call-count');
+            const orderCount = document.getElementById('crew-order-count');
+
+            if(callCount) callCount.innerText = `${crewCalls.length} Active Call${crewCalls.length !== 1 ? 's' : ''}`;
+            if(orderCount) orderCount.innerText = `${crewOrders.length} Pending`;
+
+            if(callsList) {
+                if(crewCalls.length === 0) {
+                    callsList.innerHTML = '<div class="text-xs text-slate-500 font-mono py-3 text-center">No pending attendant calls.</div>';
+                } else {
+                    callsList.innerHTML = '';
+                    crewCalls.forEach((c) => {
+                        const row = document.createElement('div');
+                        row.className = "p-2.5 rounded-xl bg-red-600/10 border border-red-500/30 flex justify-between items-center text-xs";
+                        row.innerHTML = `
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-bell text-red-500 animate-pulse"></i>
+                                <div><span class="font-bold text-white font-mono">${c.pod}</span> <span class="text-slate-400">(${c.time})</span></div>
+                            </div>
+                            <button onclick="resolveCrewCall(${c.id})" class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-mono font-bold uppercase">Resolve</button>
+                        `;
+                        callsList.appendChild(row);
+                    });
+                }
+            }
+
+            const ordersQueue = document.getElementById('crew-orders-queue');
+            if(ordersQueue) {
+                if(crewOrders.length === 0) {
+                    ordersQueue.innerHTML = '<div class="text-xs text-slate-500 font-mono py-4 text-center">Galley order queue clear.</div>';
+                } else {
+                    ordersQueue.innerHTML = '';
+                    crewOrders.forEach((o) => {
+                        const box = document.createElement('div');
+                        box.className = "p-2.5 rounded-xl bg-white/5 border border-white/10 space-y-1.5 text-xs font-mono";
+                        box.innerHTML = `
+                            <div class="flex justify-between items-center">
+                                <span class="text-amber-400 font-bold">${o.pod}</span>
+                                <span class="px-1.5 py-0.5 rounded text-[9px] ${o.status === 'Preparing' ? 'bg-amber-500/20 text-amber-300' : 'bg-cyan-500/20 text-cyan-300'} font-bold uppercase">${o.status}</span>
+                            </div>
+                            <div class="text-white font-medium text-xs">${o.item}</div>
+                            <div class="flex justify-between items-center pt-1 border-t border-white/5 text-[11px]">
+                                <span class="text-slate-400">RM ${o.price.toFixed(2)}</span>
+                                <div class="flex gap-1">
+                                    ${o.status === 'Pending' ? `<button onclick="updateCrewOrderStatus(${o.id}, 'Preparing')" class="px-2 py-0.5 bg-amber-500 text-black font-bold rounded text-[10px]">Prepare</button>` : ''}
+                                    <button onclick="updateCrewOrderStatus(${o.id}, 'Delivered')" class="px-2 py-0.5 bg-emerald-600 text-white font-bold rounded text-[10px]">Delivered</button>
+                                </div>
+                            </div>
+                        `;
+                        ordersQueue.appendChild(box);
+                    });
+                }
+            }
+        }
+        renderCrewPortal();
+
+        function callCabinAttendant() {
+            crewCalls.unshift({ id: Date.now(), pod: "Pod 04A (Active)", time: "Just now", reason: "Service Call" });
+            renderCrewPortal();
+            Swal.fire({ title: 'ATTENDANT ALERTED', text: 'Steward notified for Pod #04A.', icon: 'success', background: '#110F17', color: '#fff', confirmButtonColor: '#E50914' });
+        }
+
+        function resolveCrewCall(id) {
+            crewCalls = crewCalls.filter(c => c.id !== id);
+            renderCrewPortal();
+        }
+
+        function updateCrewOrderStatus(id, newStatus) {
+            if(newStatus === 'Delivered') { crewOrders = crewOrders.filter(o => o.id !== id); }
+            else { const item = crewOrders.find(o => o.id === id); if(item) item.status = newStatus; }
+            renderCrewPortal();
+        }
+
+        function broadcastCrewIntercom() {
+            Swal.fire({
+                title: 'CABIN INTERCOM', input: 'text', inputValue: 'Approaching Gunung Semanggol R&R. 15-minute comfort stop.',
+                background: '#110F17', color: '#fff', showCancelButton: true, confirmButtonColor: '#F59E0B', confirmButtonText: 'Broadcast'
+            }).then((res) => {
+                if(res.isConfirmed && res.value) {
+                    document.getElementById('crew-pa-text').innerText = res.value;
+                    document.getElementById('crew-pa-banner').classList.remove('hidden');
+                }
+            });
+        }
+        function dismissCrewPA() { document.getElementById('crew-pa-banner').classList.add('hidden'); }
+
+        // ----------------------------------------------------
+        // 14. MALAYSIA SATELLITE TV CHANNELS
+        // ----------------------------------------------------
+        const liveTvChannels = [
+            { id: 1, name: "TV3 HD", category: "mediaprima", chNum: "CH 103", preview: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=500&q=80", currentShow: "Buletin Utama Live", resolution: "1080P HD", transponder: "MEASAT 11.5 GHz" },
+            { id: 2, name: "TV1 HD", category: "rtm", chNum: "CH 101", preview: "https://images.unsplash.com/photo-1495020689067-958852a7765e?w=500&q=80", currentShow: "Berita Perdana RTM", resolution: "1080P HD", transponder: "MYTV Satelit" },
+            { id: 3, name: "TV2 HD", category: "rtm", chNum: "CH 102", preview: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&q=80", currentShow: "Dunia Ria Melayu", resolution: "1080P HD", transponder: "MYTV Satelit" },
+            { id: 4, name: "Astro Awani 501", category: "news", chNum: "CH 501", preview: "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=500&q=80", currentShow: "Agenda Awani: Analisis", resolution: "1080P HD", transponder: "MEASAT-3b Ku" },
+            { id: 5, name: "Sukan RTM HD", category: "sports", chNum: "CH 111", preview: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=500&q=80", currentShow: "Liga Malaysia Live", resolution: "1080P 50FPS", transponder: "RTM Satelit" },
+            { id: 6, name: "DidikTV KPM", category: "mediaprima", chNum: "CH 107", preview: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&q=80", currentShow: "Pendidikan SPM", resolution: "1080P HD", transponder: "MYTV Satelit" },
+            { id: 7, name: "8TV 八度空间", category: "mediaprima", chNum: "CH 108", preview: "https://images.unsplash.com/photo-1578681994506-b8f463449011?w=500&q=80", currentShow: "八度空间华语新闻", resolution: "1080P HD", transponder: "Media Prima Ku" },
+            { id: 8, name: "TV9 Sentiasa", category: "mediaprima", chNum: "CH 109", preview: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500&q=80", currentShow: "Animasi Wow", resolution: "1080P HD", transponder: "Media Prima Ku" },
+            { id: 9, name: "Bernama TV", category: "news", chNum: "CH 502", preview: "https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=500&q=80", currentShow: "Bernama News 24/7", resolution: "1080P HD", transponder: "MYTV Satelit" },
+            { id: 10, name: "TV Okey HD", category: "rtm", chNum: "CH 110", preview: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&q=80", currentShow: "Variasi Budaya Borneo", resolution: "1080P HD", transponder: "RTM Satelit" }
+        ];
+
+        function renderTvChannels(filter = 'all') {
+            const container = document.getElementById('tv-channels-grid');
+            if(!container) return;
+            container.innerHTML = '';
+            const filtered = filter === 'all' ? liveTvChannels : liveTvChannels.filter(c => c.category === filter);
+            filtered.forEach(c => {
+                const card = document.createElement('div');
+                card.className = "glass-card rounded-xl overflow-hidden cursor-pointer group";
+                card.onclick = () => startVideoEngine('https://vjs.zencdn.net/v/oceans.mp4', `${c.name} (${c.currentShow})`, c.chNum + ' • SATELLITE');
+                card.innerHTML = `
+                    <div class="h-28 bg-slate-900 relative overflow-hidden">
+                        <img src="${c.preview}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                        <div class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded bg-red-600 text-white text-[9px] font-mono font-bold">SAT LIVE</div>
+                        <div class="absolute top-1.5 right-1.5 px-2 py-0.5 rounded bg-black/60 text-amber-300 font-mono text-[9px] font-bold">${c.chNum}</div>
+                    </div>
+                    <div class="p-2.5 space-y-0.5">
+                        <h4 class="text-xs font-bold text-white truncate">${c.name}</h4>
+                        <p class="text-[10px] text-slate-400 truncate">${c.currentShow}</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        renderTvChannels('all');
+
+        function filterTvChannels(cat) {
+            document.querySelectorAll('.tv-filter-btn').forEach(b => b.classList.remove('bg-red-600', 'text-white'));
+            event.target.classList.add('bg-red-600', 'text-white');
+            renderTvChannels(cat);
+        }
+
+        // ----------------------------------------------------
+        // 15. FOOD & BEVERAGES
+        // ----------------------------------------------------
+        const fnbCatalog = [
+            { id: 101, name: "Nasi Lemak Sambal Sotong", category: "meals", price: 14.50, tag: "Signature", img: "https://images.unsplash.com/photo-1544025162-d76694265947?w=500&q=80" },
+            { id: 102, name: "Chicken Satay (6 Sticks)", category: "meals", price: 12.00, tag: "Halal", img: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=500&q=80" },
+            { id: 103, name: "Cold Brew Arabica Coffee", category: "coffee", price: 9.50, tag: "Fresh Roast", img: "https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?w=500&q=80" },
+            { id: 104, name: "Iced Kyoto Matcha Latte", category: "coffee", price: 11.00, tag: "Organic", img: "https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=500&q=80" },
+            { id: 105, name: "Truffle Chocolate Cake", category: "snacks", price: 11.50, tag: "Dessert", img: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=500&q=80" },
+            { id: 106, name: "Herb Potato Crisps", category: "snacks", price: 6.50, tag: "Snack", img: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=500&q=80" }
+        ];
+
+        let seatCart = [];
+
+        function renderFnbMenu(filter = 'all') {
+            const container = document.getElementById('fnb-menu-grid');
+            if(!container) return;
+            container.innerHTML = '';
+            const filtered = filter === 'all' ? fnbCatalog : fnbCatalog.filter(f => f.category === filter);
+            filtered.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "glass-card rounded-xl p-2.5 flex gap-3 items-center";
+                card.innerHTML = `
+                    <div class="w-16 h-16 rounded-lg overflow-hidden bg-slate-800 shrink-0">
+                        <img src="${item.img}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="flex-1 space-y-0.5">
+                        <span class="text-[8px] font-mono text-amber-400 font-bold uppercase">${item.tag}</span>
+                        <h4 class="text-xs font-bold text-white">${item.name}</h4>
+                        <div class="flex justify-between items-center pt-1">
+                            <span class="text-xs font-mono font-bold text-white">RM ${item.price.toFixed(2)}</span>
+                            <button onclick="addToSeatCart(${item.id})" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black font-bold text-[11px] rounded-md uppercase">+ Add</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        renderFnbMenu('all');
+
+        function filterFnb(cat) {
+            document.querySelectorAll('.fnb-filter-btn').forEach(b => b.classList.remove('bg-amber-500', 'text-black', 'font-bold'));
+            event.target.classList.add('bg-amber-500', 'text-black', 'font-bold');
+            renderFnbMenu(cat);
+        }
+
+        function addToSeatCart(id) {
+            const found = fnbCatalog.find(f => f.id === id);
+            if(found) {
+                seatCart.push(found);
+                updateSeatCartUI();
+            }
+        }
+
+        function removeFromSeatCart(index) {
+            seatCart.splice(index, 1);
+            updateSeatCartUI();
+        }
+
+        function updateSeatCartUI() {
+            const container = document.getElementById('cart-items-container');
+            const countElem = document.getElementById('cart-item-count');
+            const totalElem = document.getElementById('cart-total-price');
+            
+            countElem.innerText = `${seatCart.length} items`;
+            if(seatCart.length === 0) {
+                container.innerHTML = '<div class="text-center py-6 text-slate-500 text-xs font-mono">Your tray is empty.<br>Add meals from the menu.</div>';
+                totalElem.innerText = 'RM 0.00';
+                currentPayAmount = 24.00;
+                return;
+            }
+
+            container.innerHTML = '';
+            let total = 0;
+            seatCart.forEach((item, idx) => {
+                total += item.price;
+                const row = document.createElement('div');
+                row.className = "flex justify-between items-center p-1.5 rounded-lg bg-white/5 text-xs";
+                row.innerHTML = `
+                    <span class="text-white truncate max-w-[140px]">${item.name}</span>
+                    <div class="flex items-center gap-2 font-mono">
+                        <span class="text-amber-400">RM ${item.price.toFixed(2)}</span>
+                        <button onclick="removeFromSeatCart(${idx})" class="text-red-400 hover:text-white"><i class="fas fa-trash-can text-xs"></i></button>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+            totalElem.innerText = `RM ${total.toFixed(2)}`;
+            currentPayAmount = total;
+            document.getElementById('gateway-payable-amount').innerText = `RM ${total.toFixed(2)}`;
+        }
+
+        function submitSeatOrder() {
+            if(seatCart.length === 0) {
+                Swal.fire({ title: 'TRAY EMPTY', text: 'Select an item from the menu first.', icon: 'warning', background: '#110F17', color: '#fff' });
+                return;
+            }
+            const seat = document.getElementById('fnb-seat-select').value;
+            seatCart.forEach(item => {
+                crewOrders.push({ id: Date.now() + Math.random(), pod: seat, item: item.name, price: item.price, status: "Pending" });
+            });
+            renderCrewPortal();
+            showPage('payment-page');
+        }
+
+        // ----------------------------------------------------
+        // 16. CABIN COMFORT CONTROLS
+        // ----------------------------------------------------
+        let dndActive = false;
+        function updateReadingLight(val) { document.getElementById('reading-light-status').innerText = `${val}% Brightness`; }
+        function setLightPreset(val) { document.getElementById('reading-light-slider').value = val; updateReadingLight(val); }
+        function setMoodGlow(color, name) {
+            document.documentElement.style.setProperty('--cabin-mood-color', color);
+            document.getElementById('mood-light-name').innerText = name;
+            document.getElementById('lounge-overlay').style.opacity = '1';
+        }
+        function setSeatHeat(lvl) {
+            [0, 1, 2, 3].forEach(i => {
+                document.getElementById(`heat-${i}`).className = (i === lvl) ? "px-2 py-0.5 rounded bg-red-600 text-white text-xs font-mono font-bold" : "px-2 py-0.5 rounded bg-white/10 text-xs font-mono";
+            });
+        }
+        function toggleDND() {
+            dndActive = !dndActive;
+            const btn = document.getElementById('quick-dnd-btn');
+            btn.innerText = dndActive ? "DND: ON" : "DND: OFF";
+            btn.className = dndActive ? "px-2 py-0.5 rounded-md bg-red-600 text-[10px] font-mono font-bold text-white" : "px-2 py-0.5 rounded-md bg-white/10 text-[10px] font-mono font-medium text-slate-300";
+        }
+        function toggleLoungeMode() {
+            const overlay = document.getElementById('lounge-overlay');
+            overlay.style.opacity = '1';
+            setTimeout(() => overlay.style.opacity = '0.3', 1500);
+        }
+
+        // ----------------------------------------------------
+        // 17. SPEEDTEST
+        // ----------------------------------------------------
+        function runSpeedtest() {
+            const btn = document.getElementById('speedtest-run-btn');
+            const num = document.getElementById('speed-meter-num');
+            const ping = document.getElementById('speed-ping');
+            btn.disabled = true;
+            btn.innerText = "TESTING...";
+            let current = 20;
+            const interval = setInterval(() => {
+                current += Math.random() * 45;
+                if(current >= 384.2) {
+                    current = 384.2;
+                    clearInterval(interval);
+                    btn.disabled = false;
+                    btn.innerText = "TEST SPEED";
+                    ping.innerText = `${Math.floor(12 + Math.random() * 5)} ms`;
+                }
+                num.innerText = current.toFixed(1);
+            }, 75);
+        }
+
+        // ----------------------------------------------------
+        // 18. MUSIC PLAYER ENGINE
+        // ----------------------------------------------------
+        const musicCatalog = [
+            { title: "Eclipsa Resonance Pulse", artist: "Platinum Audio Labs", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", cover: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=600&q=80" },
+            { title: "Highway Synth Cruise", artist: "IAMF Sound Unit", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", cover: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80" }
+        ];
+
+        let currentTrackIdx = 0;
+        const audioElement = document.getElementById('anix-audio-node');
+
+        function renderMusicCatalog() {
+            const list = document.getElementById('music-track-list');
+            if(!list) return;
+            list.innerHTML = '';
+            musicCatalog.forEach((track, idx) => {
+                const item = document.createElement('div');
+                item.className = "py-2.5 flex items-center justify-between group cursor-pointer";
+                item.innerHTML = `
+                    <div class="flex items-center gap-2.5" onclick="playMusicTrack(${idx})">
+                        <div class="w-8 h-8 rounded-lg bg-purple-900/40 border border-purple-500/20 flex items-center justify-center text-purple-400 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                            <i class="fas fa-play text-[10px]"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white group-hover:text-purple-300">${track.title}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">${track.artist}</div>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-mono text-purple-400">3D IAMF</span>
+                `;
+                list.appendChild(item);
+            });
+        }
+        renderMusicCatalog();
+
+        audioElement.addEventListener('timeupdate', () => {
+            const cur = audioElement.currentTime;
+            const dur = audioElement.duration || 1;
+            document.getElementById('music-cur-time').innerText = formatTime(cur);
+            document.getElementById('music-dur-time').innerText = formatTime(dur);
+            document.getElementById('music-seek-bar').value = (cur / dur) * 100;
+        });
+
+        function playMusicTrack(idx) {
+            currentTrackIdx = idx;
+            const track = musicCatalog[idx];
+            audioElement.src = track.url;
+            audioElement.play();
+
+            document.getElementById('music-mini-title').innerText = track.title;
+            document.getElementById('music-mini-artist').innerText = track.artist;
+            document.getElementById('music-mini-cover').src = track.cover;
+            document.getElementById('music-full-title').innerText = track.title;
+            document.getElementById('music-full-artist').innerText = track.artist;
+            document.getElementById('music-full-cover').src = track.cover;
+
+            document.getElementById('music-mini-bar').classList.remove('hidden');
+            setSpinning(true);
+            updateMusicPlayIcons(true);
+        }
+
+        function toggleMusicPlay() {
+            if(!audioElement.src) { playMusicTrack(0); return; }
+            if(audioElement.paused) { audioElement.play(); setSpinning(true); updateMusicPlayIcons(true); }
+            else { audioElement.pause(); setSpinning(false); updateMusicPlayIcons(false); }
+        }
+
+        function updateMusicPlayIcons(isPlaying) {
+            document.getElementById('music-mini-play-btn').innerHTML = isPlaying ? '<i class="fas fa-pause text-xs"></i>' : '<i class="fas fa-play text-xs ml-0.5"></i>';
+            document.getElementById('music-full-play-btn').innerHTML = isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play ml-0.5"></i>';
+        }
+
+        function setSpinning(spin) {
+            const disk1 = document.getElementById('mini-spin-disk');
+            const disk2 = document.getElementById('music-full-disc');
+            if(spin) { disk1.classList.remove('paused-disk'); disk2.classList.remove('paused-disk'); }
+            else { disk1.classList.add('paused-disk'); disk2.classList.add('paused-disk'); }
+        }
+
+        function onMusicSeek(percent) {
+            const dur = audioElement.duration;
+            if(dur) audioElement.currentTime = (percent / 100) * dur;
+        }
+
+        function nextMusicTrack() { currentTrackIdx = (currentTrackIdx + 1) % musicCatalog.length; playMusicTrack(currentTrackIdx); }
+        function prevMusicTrack() { currentTrackIdx = (currentTrackIdx - 1 + musicCatalog.length) % musicCatalog.length; playMusicTrack(currentTrackIdx); }
+        function openMusicFullPlayer() { document.getElementById('music-full-modal').classList.remove('hidden-page'); }
+        function closeMusicFullPlayer() { document.getElementById('music-full-modal').classList.add('hidden-page'); }
+        function closeMusicMiniPlayer() { audioElement.pause(); document.getElementById('music-mini-bar').classList.add('hidden'); setSpinning(false); }
+        function toggleMusicShuffle() { document.getElementById('music-shuffle-btn').classList.toggle('text-purple-400'); }
+        function toggleMusicRepeat() { document.getElementById('music-repeat-btn').classList.toggle('text-purple-400'); }
+
+        function formatTime(secs) {
+            const m = Math.floor(secs / 60);
+            const s = Math.floor(secs % 60);
+            return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        // ----------------------------------------------------
+        // 19. ROTARY VOLUME KNOB
+        // ----------------------------------------------------
+        const volKnob = document.getElementById('volume-knob');
+        const volIndicator = document.getElementById('volume-indicator');
+        const volText = document.getElementById('volume-text');
+        const volRing = document.getElementById('volume-ring');
+        let isDraggingVol = false;
+        let startY = 0;
+        let currentVolume = 50;
+
+        function setVolume(pct) {
+            pct = Math.max(0, Math.min(100, pct));
+            currentVolume = pct;
+            const angle = -135 + (pct / 100) * 270;
+            volIndicator.style.transform = `rotate(${angle}deg)`;
+            volText.innerText = `${Math.round(pct)}%`;
+            volRing.style.strokeDashoffset = 264 - (198 * (pct / 100));
+            if(videoPlayerInstance) videoPlayerInstance.volume(pct / 100);
+            if(audioElement) audioElement.volume = pct / 100;
+        }
+
+        function startDrag(y) { isDraggingVol = true; startY = y; volKnob.classList.add('scale-95'); }
+        function handleDrag(y) {
+            if(!isDraggingVol) return;
+            const deltaY = startY - y;
+            setVolume(currentVolume + deltaY * 0.7);
+            startY = y;
+        }
+        function stopDrag() { isDraggingVol = false; volKnob.classList.remove('scale-95'); }
+
+        volKnob.addEventListener('mousedown', (e) => startDrag(e.clientY));
+        document.addEventListener('mousemove', (e) => handleDrag(e.clientY));
+        document.addEventListener('mouseup', stopDrag);
+        volKnob.addEventListener('touchstart', (e) => startDrag(e.touches[0].clientY), {passive: true});
+        document.addEventListener('touchmove', (e) => handleDrag(e.touches[0].clientY), {passive: true});
+        document.addEventListener('touchend', stopDrag);
+        setVolume(50);
+
+        // ----------------------------------------------------
+        // 20. THREE.JS & AMBIENT CANVAS
+        // ----------------------------------------------------
+        function initThreeJS() {
+            const container = document.getElementById('threejs-canvas-container');
+            if(!container) return;
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            const geometry = new THREE.IcosahedronGeometry(1, 1);
+            const material = new THREE.MeshBasicMaterial({ color: 0x00F0FF, wireframe: true, transparent: true, opacity: 0.35 });
+            const sphere = new THREE.Mesh(geometry, material);
+            scene.add(sphere);
+            camera.position.z = 2.5;
+            function animate() {
+                requestAnimationFrame(animate);
+                sphere.rotation.x += 0.004;
+                sphere.rotation.y += 0.008;
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+        setTimeout(initThreeJS, 250);
+
+        const canvas = document.getElementById('bg-ambient-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class AmbientParticle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = (Math.random() - 0.5) * 0.25;
+                this.speedY = (Math.random() - 0.5) * 0.25;
+                const hues = [0, 260, 280, 200];
+                this.hue = hues[Math.floor(Math.random() * hues.length)];
+            }
+            update() {
+                this.x += this.speedX; this.y += this.speedY;
+                if(this.x > canvas.width) this.x = 0; if(this.x < 0) this.x = canvas.width;
+                if(this.y > canvas.height) this.y = 0; if(this.y < 0) this.y = canvas.height;
+            }
+            draw() {
+                ctx.fillStyle = `hsla(${this.hue}, 80%, 60%, 0.25)`;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+        for(let i = 0; i < 35; i++) particles.push(new AmbientParticle());
+        function animateBg() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(animateBg);
+        }
+        animateBg();
+
+        // ----------------------------------------------------
+        // 21. WALLPAPER & ACCESSIBILITY
+        // ----------------------------------------------------
+        function applyWallpaper(url, name) {
+            document.documentElement.style.setProperty('--wallpaper-image', `url('${url}')`);
+            Swal.fire({ title: 'THEME APPLIED', text: name, icon: 'success', timer: 1000, background: '#110F17', color: '#fff', showConfirmButton: false });
+        }
+        function resetDefaultWallpaper() {
+            applyWallpaper('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop', 'Cyber Neon Horizon');
+        }
+        function toggleAccessibilityModal() {
+            document.body.classList.toggle('a11y-high-contrast');
+        }
+        function triggerSOS() {
+            Swal.fire({ title: 'SOS TRANSMITTED', text: 'Emergency telemetry beacon dispatched to highway control.', icon: 'warning', background: '#110F17', color: '#fff' });
+        }
+        function clearAdminTerminal() {
+            document.getElementById('ota-terminal').innerHTML = '<div>[SYS] Socket buffer cleared. Ready.</div>';
+        }
+    </script>
+</body>
+</html>
+

@@ -1,17 +1,4 @@
-Here is the updated, unified single-file solution.
-Key Upgrades & Changes Included:
- * Removed: The "Offline Library / Mount Local Files & Folders" widget from the homepage dashboard.
- * Admin PIN Lock: Accessing the Admin panel now prompts for a secure PIN (2026 or 7788).
- * Cleaned Top Header: Cleaned up top icon clutter into a streamlined executive control cluster.
- * Homepage 4K Trailer Player: Direct trailer preview launcher on the hero banner with a dedicated trailer modal.
- * Membership Memory Profiles Page (membership-page): Persistent passenger profile with membership tier status, reward points, saved pod seat preferences, and trip history.
- * Local Payment Gateway & Digital Receipts (payment-page): Interactive payment terminal (DuitNow QR, FPX, Touch 'n Go eWallet, Cards) that processes seat orders and prints/renders verifiable digital tax receipts.
- * Auto-Brightness Sensor Detection: Integration with the Ambient Light Sensor API (AmbientLightSensor) with intelligent time-of-day lux fallback that dynamically adjusts screen luminosity and UI contrast.
- * System Information Hub (sysinfo-page): Real-time hardware telemetry, Measat-3b satellite transponder frequencies, RAM/NVMe partitions, and bus power diagnostics.
- * Player Settings Hub (settings-page): Dedicated settings for video playback (hardware acceleration, video tone mapping filters, subtitle formatting) and IAMF music playback (ReplayGain, 3D acoustic room simulator, bass exciters).
- * Extensions & Plugins Hub (extensions-page): Modular toggleable add-ons (Live Translator, Karaoke Mode, Highway Speed Radar, Subtitle Enhancer).
- * Corridor Weather Telemetry Modal: Comprehensive live meteorological radar and forecast along the North-South highway.
- * New Luxury Wallpapers: Added new ultra-high-resolution aesthetic wallpapers with live switching.
+
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 <head>
